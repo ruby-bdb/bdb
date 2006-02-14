@@ -1,0 +1,15 @@
+9-Feb-2006
+  Done:
+   All common environment, database and cursor functions are in. They are also
+   _fully_ unit tested and are in production under heavy use. There are a
+   few missing, like pget.
+
+  Limitations:
+   If Ruby process exits and there are any open cursors (your program did not
+   close them) the process will SEGV. This is due to dbc_free trying to close
+   the cursor(s), even though the DB may already be closed. This will be fixed
+   by keeping track of open cursors and automatically closing then when
+   db->close is called, either by calling close or during finalization. Other
+   than messing up your BDB environment, the SEGV is larglely harmless (but
+   annoying). It should never happen if your program is written correctly.
+
