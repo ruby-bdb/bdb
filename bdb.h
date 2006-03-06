@@ -4,8 +4,13 @@
 
 #include <ruby.h>
 #include <version.h>
-#include <db4/db.h>
+#include <extconf.h>
 
+#ifdef INC_DB4
+#include <db4/db.h>
+#else
+#include <db.h>
+#endif
 
 #define NOTXN NULL
 
