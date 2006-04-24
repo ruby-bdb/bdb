@@ -560,6 +560,39 @@ VALUE db_rename(VALUE obj, VALUE vdisk_file,
   return Qtrue;
 }
 
+VALUE db_sync(VALUE obj)
+{
+  t_dbh *dbh;
+  int rv;
+
+  Data_Get_Struct(obj,t_dbh,dbh);
+  rv=dbh->db->sync(dbh->db,NOFLAGS);
+
+  if (rv)
+    raise_error(rv,"db_sync failed: %s",db_strerror(rv));
+  return Qtrue;
+}
+
+VALUE db_truncate(VALUE obj, VALUE vtxn)
+{
+  t_dbh *dbh;
+  t_txnh *txn=NULL;
+  int rv;
+  VALUE result;
+  u_int32_t count;
+
+  if ( ! NIL_P(vtxn) )
+    Data_Get_Struct(vtxn,t_txnh,txn);
+  
+  Data_Get_Struct(obj,t_dbh,dbh);
+
+  rv=dbh->db->truncate(dbh->db,txn?txn->txn:NULL,&count,NOFLAGS);
+  if (rv)
+    raise_error(rv,"db_truncate: %s",db_strerror(rv));
+
+  return INT2FIX(count);
+}
+
 VALUE db_key_range(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vflags)
 {
   t_dbh *dbh;
@@ -1570,6 +1603,10 @@ void Init_bdb2() {
   rb_define_method(cDb,"stat",db_stat,2);
   cDbStat = rb_define_class_under(cDb,"Stat",rb_cObject);
   rb_define_method(cDbStat,"[]",stat_aref,1);
+
+  rb_define_method(cDb,"sync",db_sync,0);
+  rb_define_method(cDb,"truncate",db_truncate,1);
+
 #if DB_VERSION_MINOR > 3
   rb_define_method(cDb,"compact",db_compact,5);
 #endif
