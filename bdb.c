@@ -1650,3 +1650,6 @@ void Init_bdb2() {
   rb_define_method(cTxn,"tid",txn_id,0);
   rb_define_method(cTxn,"set_timeout",txn_set_timeout,2);
 }
+void Init_bdb2a() {
+  Init_bdb2();
+}

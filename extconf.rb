@@ -1,6 +1,20 @@
 #!/usr/bin/env ruby
-
+require 'getoptlong'
 require 'mkmf'
+
+target="bdb2"
+
+opts = GetoptLong.new(
+                      [ "--va", GetoptLong::NO_ARGUMENT]
+                      )
+opts.each do |opt,arg|
+  case opt
+  when '--va'
+    target="bdb2a"
+  end
+end
+
+message "Target is #{target}\n"
 
 if CONFIG['INSTALL'] =~ %r{./install-sh}
   CONFIG.delete("INSTALL")
@@ -13,7 +27,7 @@ if ri < 1008004
   exit(3)
 end
 
-inc_dir,lib_dir = dir_config('bdb2')
+inc_dir,lib_dir = dir_config(target)
 
 $stderr.puts("lib_dir=#{lib_dir} inc_dir=#{inc_dir}")
 
@@ -54,7 +68,7 @@ message("header is #{header_loc}\n")
 
 inc="#include <#{this_h}>"
 n=0
-message("Writing bdb_aux.c (defines), this takes a while")
+message("Writing bdb_aux._c (defines), this takes a while\n")
 defines=[]
 File.open(header_loc) {|fd|
   File.open("bdb_aux._c","w") {|hd|
@@ -71,14 +85,14 @@ File.open(header_loc) {|fd|
       end
     }
   }
+  message("\nwrote #{n} defines\n")
 } unless File.exist?("bdb_aux._c")
-message("\nwrote #{n} defines\n")
 
 $defs << $INCFLAGS
 
 if lib_ok and inc_ok
   create_header
-  create_makefile('bdb2')
+  create_makefile(target)
 else
   $stderr.puts("cannot create Makefile")
 end
