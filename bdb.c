@@ -14,6 +14,7 @@
 
 VALUE mBdb;  /* Top level module */
 VALUE cDb;   /* DBT class */
+VALUE cDbStat; /* db status class, not specialized for DBTYPE */
 VALUE cEnv;  /* Environment class */
 VALUE cTxn;  /* Transaction class */
 VALUE cCursor; /* Cursors */
@@ -69,7 +70,7 @@ static void db_free(t_dbh *dbh)
 #endif
 
   if ( dbh ) {
-    if ( dbh->db ) {
+    if ( dbh->db && dbh->filename[0]!=0 ) {
       dbh->db->close(dbh->db,NOFLAGS);
     }
     free(dbh);
@@ -141,6 +142,7 @@ VALUE db_init_aux(VALUE obj,t_envh * eh)
   dbh->db=db;
   dbh->self=obj;
   dbh->env=eh;
+  memset(&(dbh->filename),0,FNLEN+1);
 
   if (eh) {
     rb_ary_push(eh->adb,obj);
@@ -156,7 +158,8 @@ VALUE db_initialize(VALUE obj)
   return db_init_aux(obj,NULL);
 }
 
-VALUE db_open(VALUE obj, VALUE vtxn, VALUE vdisk_file, VALUE vlogical_db,
+VALUE db_open(VALUE obj, VALUE vtxn, VALUE vdisk_file,
+	      VALUE vlogical_db,
 	      VALUE vdbtype, VALUE vflags, VALUE vmode)
 {
   t_dbh *dbh;
@@ -197,9 +200,10 @@ VALUE db_open(VALUE obj, VALUE vtxn, VALUE vdisk_file, VALUE vlogical_db,
   if ( NIL_P(dbh->adbc) )
     raise_error(0,"db handle already used and closed");
   
-  rv = dbh->db->open(dbh->db,txn?txn->txn:NULL,StringValueCStr(vdisk_file),
-		      logical_db,
-		      dbtype,flags,mode);
+  rv = dbh->db->open(dbh->db,txn?txn->txn:NULL,
+		     StringValueCStr(vdisk_file),
+		     logical_db,
+		     dbtype,flags,mode);
   if (rv != 0) {
     raise_error(rv,"db_open failure: %s(%d)",db_strerror(rv),rv);
   }
@@ -233,7 +237,7 @@ VALUE db_close(VALUE obj, VALUE vflags)
 
   flags=NUM2INT(vflags);
   Data_Get_Struct(obj,t_dbh,dbh);
-  if ( dbh->db==NULL )
+  if ( dbh->db==NULL || strlen(dbh->filename)==0 )
     return Qnil;
 
   if (RARRAY(dbh->adbc)->len > 0 ) {
@@ -505,6 +509,91 @@ VALUE db_get_type(VALUE obj)
   if (rv)
     raise_error(rv,"db_get_type failed: %s",db_strerror(rv));
   return INT2FIX(dbtype);
+}
+
+VALUE db_remove(VALUE obj, VALUE vdisk_file,
+		VALUE vlogical_db, VALUE vflags)
+{
+  t_dbh *dbh;
+  int rv;
+  u_int32_t flags=0;
+  char *logical_db=NULL;
+
+  if ( ! NIL_P(vflags) )
+    flags=NUM2INT(vflags);
+
+  Data_Get_Struct(obj,t_dbh,dbh);
+  rv=dbh->db->remove(dbh->db,
+		     NIL_P(vdisk_file)?NULL:StringValueCStr(vdisk_file),
+		     NIL_P(vlogical_db)?NULL:StringValueCStr(vlogical_db),
+		     flags);
+
+  if (rv)
+    raise_error(rv,"db_remove failed: %s",db_strerror(rv));
+  return Qtrue;
+}
+
+VALUE db_rename(VALUE obj, VALUE vdisk_file,
+		VALUE vlogical_db, VALUE newname, VALUE vflags)
+{
+  t_dbh *dbh;
+  int rv;
+  u_int32_t flags=0;
+  char *disk_file=NULL;
+  char *logical_db=NULL;
+
+  if ( ! NIL_P(vflags) )
+    flags=NUM2INT(vflags);
+
+  if ( NIL_P(newname) )
+    raise_error(0,"db_rename newname must be specified");
+
+  Data_Get_Struct(obj,t_dbh,dbh);
+  rv=dbh->db->rename(dbh->db,
+		     NIL_P(vdisk_file)?NULL:StringValueCStr(vdisk_file),
+		     NIL_P(vlogical_db)?NULL:StringValueCStr(vlogical_db),
+		     StringValueCStr(newname),
+		     flags);
+
+  if (rv)
+    raise_error(rv,"db_rename failed: %s",db_strerror(rv));
+  return Qtrue;
+}
+
+VALUE db_key_range(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vflags)
+{
+  t_dbh *dbh;
+  t_txnh *txn=NULL;
+  DBT key;
+  u_int32_t flags;
+  int rv;
+  DB_KEY_RANGE key_range;
+  VALUE result;
+
+  if ( ! NIL_P(vtxn) )
+    Data_Get_Struct(vtxn,t_txnh,txn);
+  
+  if ( ! NIL_P(vflags) )
+    flags=NUM2INT(vflags);
+
+  Data_Get_Struct(obj,t_dbh,dbh);
+
+  memset(&key,0,sizeof(DBT));
+  StringValue(vkey);
+  key.data = RSTRING(vkey)->ptr;
+  key.size = RSTRING(vkey)->len;
+  key.flags = LMEMFLAG;
+
+  rv=dbh->db->key_range(dbh->db,txn?txn->txn:NULL,&key,
+			&key_range,flags);
+  if (rv)
+    raise_error(rv,"db_key_range: %s",db_strerror(rv));
+
+  result=rb_ary_new3(3,
+		     rb_float_new(key_range.less),
+		     rb_float_new(key_range.equal),
+		     rb_float_new(key_range.greater));
+  return result;
 }
 
 VALUE db_del(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vflags)
@@ -1095,7 +1184,120 @@ VALUE env_txn_stat_active(DB_TXN_ACTIVE *t)
   /* XA status is currently excluded */
   return ao;
 }
+VALUE db_stat(VALUE obj, VALUE vtxn, VALUE vflags)
+{
+  u_int32_t flags=0;
+  int rv;
+  t_dbh *dbh;
+  t_txnh *txn;
+  DBTYPE dbtype;
+  union {
+    void *stat;
+    DB_HASH_STAT *hstat;
+    DB_BTREE_STAT *bstat;
+    DB_QUEUE_STAT *qstat;
+  } su;
+  VALUE s_obj;
 
+  if ( ! NIL_P(vflags) )
+    flags=NUM2INT(vflags);
+  if ( ! NIL_P(vtxn) )
+    Data_Get_Struct(vtxn,t_txnh,txn);
+
+  Data_Get_Struct(obj,t_dbh,dbh);
+  
+  rv=dbh->db->get_type(dbh->db,&dbtype);
+  if (rv)
+    raise_error(rv,"db_stat %s",db_strerror(rv));
+  rv=dbh->db->stat(dbh->db,txn?txn->txn:NULL,&(su.stat),flags);
+  if (rv)
+    raise_error(rv,"db_stat %s",db_strerror(rv));
+
+  s_obj=rb_class_new_instance(0,NULL,cDbStat);
+  rb_iv_set(s_obj,"@dbtype",INT2FIX(dbtype));
+
+  switch(dbtype) {
+
+#define hs_int(field)			      \
+  rb_iv_set(s_obj,"@field",INT2FIX(su.hstat->field))
+
+  case DB_HASH:
+    hs_int(hash_magic);
+    hs_int(hash_version);		/* Version number. */
+    hs_int(hash_metaflags);	/* Metadata flags. */
+    hs_int(hash_nkeys);		/* Number of unique keys. */
+    hs_int(hash_ndata);		/* Number of data items. */
+    hs_int(hash_pagesize);	/* Page size. */
+    hs_int(hash_ffactor);		/* Fill factor specified at create. */
+    hs_int(hash_buckets);		/* Number of hash buckets. */
+    hs_int(hash_free);		/* Pages on the free list. */
+    hs_int(hash_bfree);		/* Bytes free on bucket pages. */
+    hs_int(hash_bigpages);	/* Number of big key/data pages. */
+    hs_int(hash_big_bfree);	/* Bytes free on big item pages. */
+    hs_int(hash_overflows);	/* Number of overflow pages. */
+    hs_int(hash_ovfl_free);	/* Bytes free on ovfl pages. */
+    hs_int(hash_dup);		/* Number of dup pages. */
+    hs_int(hash_dup_free);	/* Bytes free on duplicate pages. */
+    break;
+
+#define bs_int(field)					\
+    rb_iv_set(s_obj,"@" #field,INT2FIX(su.bstat->field))
+    
+  case DB_BTREE:
+  case DB_RECNO:
+    bs_int(bt_magic);		/* Magic number. */
+    bs_int(bt_version);		/* Version number. */
+    bs_int(bt_metaflags);		/* Metadata flags. */
+    bs_int(bt_nkeys);		/* Number of unique keys. */
+    bs_int(bt_ndata);		/* Number of data items. */
+    bs_int(bt_pagesize);		/* Page size. */
+    bs_int(bt_maxkey);		/* Maxkey value. */
+    bs_int(bt_minkey);		/* Minkey value. */
+    bs_int(bt_re_len);		/* Fixed-length record length. */
+    bs_int(bt_re_pad);		/* Fixed-length record pad. */
+    bs_int(bt_levels);		/* Tree levels. */
+    bs_int(bt_int_pg);		/* Internal pages. */
+    bs_int(bt_leaf_pg);		/* Leaf pages. */
+    bs_int(bt_dup_pg);		/* Duplicate pages. */
+    bs_int(bt_over_pg);		/* Overflow pages. */
+    bs_int(bt_empty_pg);		/* Empty pages. */
+    bs_int(bt_free);		/* Pages on the free list. */
+    bs_int(bt_int_pgfree);	/* Bytes free in internal pages. */
+    bs_int(bt_leaf_pgfree);	/* Bytes free in leaf pages. */
+    bs_int(bt_dup_pgfree);	/* Bytes free in duplicate pages. */
+    bs_int(bt_over_pgfree);	/* Bytes free in overflow pages. */
+    
+    break;
+
+#define qs_int(field)					\
+    rb_iv_set(s_obj,"@field",INT2FIX(su.qstat->field))
+    
+  case DB_QUEUE:
+    qs_int(qs_magic);		/* Magic number. */
+    qs_int(qs_version);		/* Version number. */
+    qs_int(qs_metaflags);		/* Metadata flags. */
+    qs_int(qs_nkeys);		/* Number of unique keys. */
+    qs_int(qs_ndata);		/* Number of data items. */
+    qs_int(qs_pagesize);		/* Page size. */
+    qs_int(qs_extentsize);	/* Pages per extent. */
+    qs_int(qs_pages);		/* Data pages. */
+    qs_int(qs_re_len);		/* Fixed-length record length. */
+    qs_int(qs_re_pad);		/* Fixed-length record pad. */
+    qs_int(qs_pgfree);		/* Bytes free in data pages. */
+    qs_int(qs_first_recno);	/* First not deleted record. */
+    qs_int(qs_cur_recno);		/* Next available record number. */
+    
+    break;
+  }
+
+  free(su.stat);
+  return s_obj;
+}
+
+VALUE stat_aref(VALUE obj, VALUE vname)
+{
+  rb_iv_get(obj,RSTRING(rb_str_concat(rb_str_new2("@"),vname))->ptr);
+}
 VALUE env_txn_stat(VALUE obj, VALUE vflags)
 {
   u_int32_t flags=0;
@@ -1362,6 +1564,12 @@ void Init_bdb2() {
   rb_define_method(cDb,"join",db_join,2);
   rb_define_method(cDb,"get_byteswapped",db_get_byteswapped,0);
   rb_define_method(cDb,"get_type",db_get_type,0);
+  rb_define_method(cDb,"remove",db_remove,3);
+  rb_define_method(cDb,"key_range",db_key_range,3);
+  rb_define_method(cDb,"rename",db_rename,4);
+  rb_define_method(cDb,"stat",db_stat,2);
+  cDbStat = rb_define_class_under(cDb,"Stat",rb_cObject);
+  rb_define_method(cDbStat,"[]",stat_aref,1);
 #if DB_VERSION_MINOR > 3
   rb_define_method(cDb,"compact",db_compact,5);
 #endif
@@ -1392,8 +1600,11 @@ void Init_bdb2() {
   rb_define_method(cEnv,"get_tx_max",env_get_tx_max,0);
   
   cTxnStat = rb_define_class_under(mBdb,"TxnStat",rb_cObject);
+  rb_define_method(cTxnStat,"[]",stat_aref,1);
+
   cTxnStatActive =
     rb_define_class_under(cTxnStat,"Active",rb_cObject);
+  rb_define_method(cTxnStatActive,"[]",stat_aref,1);
 
   cTxn = rb_define_class_under(mBdb,"Txn",rb_cObject);
   rb_define_method(cTxn,"commit",txn_commit,1);
