@@ -999,6 +999,12 @@ VALUE dbc_close(VALUE obj)
   return Qnil;
 }
 
+/*
+ * call-seq:
+ * dbc.get(key,data,flags) -> [key,data]
+ *
+ * get data by key or key and data. returns array of key,data
+ */
 VALUE dbc_get(VALUE obj, VALUE vkey, VALUE vdata, VALUE vflags)
 {
   t_dbch *dbch;
@@ -1038,6 +1044,12 @@ VALUE dbc_get(VALUE obj, VALUE vkey, VALUE vdata, VALUE vflags)
   }
   return Qnil;
 }
+/*
+ * call-seq:
+ * dbc.pget(key,data,flags) -> [key,pkey,data]
+ *
+ * cursor pget, returns array(key, primary key, data)
+ */
 VALUE dbc_pget(VALUE obj, VALUE vkey, VALUE vdata, VALUE vflags)
 {
   t_dbch *dbch;
@@ -1081,6 +1093,12 @@ VALUE dbc_pget(VALUE obj, VALUE vkey, VALUE vdata, VALUE vflags)
   return Qnil;
 }
 
+/*
+ * call-seq:
+ * dbc.put(key,data,flags) -> data
+ *
+ * cursor put key/data
+ */
 VALUE dbc_put(VALUE obj, VALUE vkey, VALUE vdata, VALUE vflags)
 {
   t_dbch *dbch;
@@ -1116,6 +1134,14 @@ VALUE dbc_put(VALUE obj, VALUE vkey, VALUE vdata, VALUE vflags)
   return vdata;
 }
 
+/*
+ * call-seq:
+ * dbc.del -> true|nil
+ *
+ * delete tuple at current cursor position. returns true if
+ * something was deleted, nil otherwise (DB_KEYEMPTY)
+ *
+ */
 VALUE dbc_del(VALUE obj)
 {
   t_dbch *dbch;
@@ -1131,6 +1157,12 @@ VALUE dbc_del(VALUE obj)
   return Qtrue;
 }
 
+/*
+ * call-seq:
+ * dbc.count -> Fixnum(count)
+ *
+ * returns cursor count as per DB.
+ */
 VALUE dbc_count(VALUE obj)
 {
   t_dbch *dbch;
@@ -1142,7 +1174,7 @@ VALUE dbc_count(VALUE obj)
   if (rv != 0)
     raise_error(rv, "db_count failure: %s",db_strerror(rv));
   
-  return INT2NUM(count);
+  return INT2FIX(count);
 }
 
 static void env_free(void *p)
@@ -1167,6 +1199,21 @@ static void env_mark(t_envh *eh)
   rb_gc_mark(eh->adb);
   rb_gc_mark(eh->atxn);
 }
+
+/*
+ * Document-class: Bdb::Env
+ *
+ * Encapsulated DB environment. Create by simple new (with
+ * flags as neede), then open. Database handles created with
+ * env.db -> Bdb::Db object.
+ */
+
+/*
+ * call-seq:
+ * new(flags) -> object
+ *
+ *
+ */
 VALUE env_new(VALUE class, VALUE vflags)
 {
   t_envh *eh;
@@ -1190,6 +1237,12 @@ VALUE env_new(VALUE class, VALUE vflags)
   return obj;
 }
 
+/*
+ * call-seq:
+ * env.open(homedir,flags,mode) -> self
+ *
+ * open an environment
+ */
 VALUE env_open(VALUE obj, VALUE vhome, VALUE vflags, VALUE vmode)
 {
   t_envh *eh;
@@ -1214,6 +1267,20 @@ VALUE env_open(VALUE obj, VALUE vhome, VALUE vflags, VALUE vmode)
 
 VALUE txn_abort(VALUE);
 
+/*
+ * call-seq:
+ * env.close -> self
+ *
+ * close an environment. Do not use it after you close it. 
+ * The close process will automatically abort any open transactions
+ * and close open databases (which also closes open cursors).
+ * But this is just an effort to keep your dbs and envs from
+ * becoming corrupted due to ruby errors that exit
+ * unintentionally. However, to make this at all worth anything
+ * use ObjectSpace.define_finalizer which calls env.close to
+ * approach some assurance of it happening.
+ *
+ */
 VALUE env_close(VALUE obj)
 {
   t_envh *eh;
@@ -1253,6 +1320,12 @@ VALUE env_close(VALUE obj)
   return obj;
 }
 
+/*
+ * call-seq:
+ * env.db -> Bdb::Db instance
+ *
+ * create a db associated with an environment
+ */
 VALUE env_db(VALUE obj)
 {
   t_envh *eh;
@@ -1264,6 +1337,14 @@ VALUE env_db(VALUE obj)
   return db_init_aux(dbo,eh);
 }
 
+/*
+ * call-seq:
+ * env.cachesize=Fixnum|Bignum
+ *
+ * set the environment cache size. If it is a Bignum then it
+ * will populate the bytes and gbytes part of the DB struct.
+ * Fixnums will only populate bytes (which is still pretty big).
+ */
 VALUE env_set_cachesize(VALUE obj, VALUE size)
 {
   t_envh *eh;
@@ -1313,14 +1394,39 @@ VALUE env_set_flags(VALUE obj, VALUE vflags, int onoff)
   return Qtrue;
 }
 
+/*
+ * call-seq:
+ * env.flags_on=flags
+ *
+ * set the 'flags' on. An or'ed set of flags will be set on.
+ * Only included flags will be affected. Serialized calls
+ * will only affect flags indicated (leaving others, default or
+ * set as they were).
+ */
 VALUE env_set_flags_on(VALUE obj, VALUE vflags)
 {
   return env_set_flags(obj,vflags,1);
 }
+/*
+ * call-seq:
+ * env.flags_off=flags
+ *
+ * set the 'flags' off. An or'ed set of flags will be set off.
+ * Only included flags will be affected. Serialized calls
+ * will only affect flags indicated (leaving others, default or
+ * set as they were).
+ */
 VALUE env_set_flags_off(VALUE obj, VALUE vflags)
 {
   return env_set_flags(obj,vflags,0);
 }
+/*
+ * call-seq:
+ * env.list_dbs -> [Bdb::Db array]
+ *
+ * return 0 or more open databases within the receiver environment.
+ * If 0, will return [], not nil.
+ */
 VALUE env_list_dbs(VALUE obj)
 {
   t_envh *eh;
@@ -1346,6 +1452,12 @@ static void txn_free(t_txnh *txn)
   }
 }
 
+/*
+ * call-seq:
+ * env.txn_begin(txn_parent,flags) -> Bdb::Txn
+ *
+ * start a root transaction or embedded (via txn_parent).
+ */
 VALUE env_txn_begin(VALUE obj, VALUE vtxn_parent, VALUE vflags)
 {
   t_txnh *parent=NULL, *txn=NULL;
@@ -1378,6 +1490,12 @@ VALUE env_txn_begin(VALUE obj, VALUE vtxn_parent, VALUE vflags)
   return t_obj;
 }
 
+/*
+ * call-seq:
+ * env.txn_checkpoint -> true
+ *
+ * Cause env transaction state to be checkpointed.
+ */
 VALUE env_txn_checkpoint(VALUE obj, VALUE vkbyte, VALUE vmin,
 			 VALUE vflags)
 {
@@ -1419,6 +1537,17 @@ VALUE env_txn_stat_active(DB_TXN_ACTIVE *t)
   /* XA status is currently excluded */
   return ao;
 }
+
+/*
+ * call-seq:
+ * db.stat(txn,flags) -> Bdb::Db::Stat
+ *
+ * get database status. Returns a Bdb::Db::Stat object that
+ * is specialized to the db_type and only responds to [] to
+ * retrieve status values. All values are stored in instance
+ * variables, so singleton classes can be created and instance_eval
+ * will work.
+ */
 VALUE db_stat(VALUE obj, VALUE vtxn, VALUE vflags)
 {
   u_int32_t flags=0;
@@ -1529,10 +1658,25 @@ VALUE db_stat(VALUE obj, VALUE vtxn, VALUE vflags)
   return s_obj;
 }
 
+/*
+ * call-seq:
+ * stat[name] -> value
+ *
+ * return status value
+ */
 VALUE stat_aref(VALUE obj, VALUE vname)
 {
   rb_iv_get(obj,RSTRING(rb_str_concat(rb_str_new2("@"),vname))->ptr);
 }
+
+/*
+ * call-seq:
+ * env.txn_stat -> Bdb::TxnStat
+ *
+ * get the environment transaction status. Each active
+ * transaction will be contained within a Bdb::TxnStat::Active
+ * class.
+ */
 VALUE env_txn_stat(VALUE obj, VALUE vflags)
 {
   u_int32_t flags=0;
@@ -1594,6 +1738,12 @@ VALUE env_txn_stat(VALUE obj, VALUE vflags)
   return s_obj;
 }
 
+/*
+ * call-seq:
+ * env.set_timeout(timeout,flags) -> timeout
+ *
+ * set lock and transaction timeout
+ */
 VALUE env_set_timeout(VALUE obj, VALUE vtimeout, VALUE vflags)
 {
   t_envh *eh;
@@ -1614,6 +1764,12 @@ VALUE env_set_timeout(VALUE obj, VALUE vtimeout, VALUE vflags)
   return vtimeout;
 }
 
+/*
+ * call-seq:
+ * env.get_timeout(flags) -> Fixnum
+ *
+ * Get current transaction and lock timeout value
+ */
 VALUE env_get_timeout(VALUE obj, VALUE vflags)
 {
   t_envh *eh;
@@ -1633,6 +1789,12 @@ VALUE env_get_timeout(VALUE obj, VALUE vflags)
   return INT2FIX(timeout);
 }
 
+/*
+ * call-seq:
+ * env.set_tx_max(max) -> max
+ *
+ * Set the maximum number of transactions with the environment
+ */
 VALUE env_set_tx_max(VALUE obj, VALUE vmax)
 {
   t_envh *eh;
@@ -1650,6 +1812,12 @@ VALUE env_set_tx_max(VALUE obj, VALUE vmax)
   return vmax;
 }
 
+/*
+ * call-seq
+ * env.get_tx_max -> Fixnum
+ *
+ * Get current maximum number of transactions
+ */
 VALUE env_get_tx_max(VALUE obj)
 {
   t_envh *eh;
@@ -1676,6 +1844,12 @@ static void txn_finish(t_txnh *txn)
   txn->env=NULL;
 }
 
+/*
+ * call-seq:
+ * txn.commit(flags) -> true
+ *
+ * commit a transaction
+ */
 VALUE txn_commit(VALUE obj, VALUE vflags)
 {
   t_txnh *txn=NULL;
@@ -1695,6 +1869,12 @@ VALUE txn_commit(VALUE obj, VALUE vflags)
   return Qtrue;
 }
 
+/*
+ * call-seq:
+ * txn.abort -> true
+ *
+ * abort a transaction
+ */
 VALUE txn_abort(VALUE obj)
 {
   t_txnh *txn=NULL;
@@ -1710,6 +1890,13 @@ VALUE txn_abort(VALUE obj)
   return Qtrue;
 }
 
+/*
+ * call-seq:
+ * txn.discard -> true
+ *
+ * discard a transaction. Since prepare is not yet supported,
+ * I don't think this has much value.
+ */
 VALUE txn_discard(VALUE obj)
 {
   t_txnh *txn=NULL;
@@ -1725,6 +1912,13 @@ VALUE txn_discard(VALUE obj)
   return Qtrue;
 }
 
+/*
+ * call-seq:
+ * txn.tid -> Fixnum
+ * 
+ * return the transaction id, (named tid to not conflict with
+ * ruby's id method)
+ */
 VALUE txn_id(VALUE obj)
 {
   t_txnh *txn=NULL;
@@ -1738,6 +1932,12 @@ VALUE txn_id(VALUE obj)
   return INT2FIX(rv);
 }
 
+/*
+ * call-seq:
+ * tx.set_timeout(timeout,flags) -> true
+ *
+ * set transaction lock timeout
+ */
 VALUE txn_set_timeout(VALUE obj, VALUE vtimeout, VALUE vflags)
 {
   t_txnh *txn=NULL;
