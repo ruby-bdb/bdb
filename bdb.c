@@ -1,3 +1,10 @@
+/*
+ * Ruby library that wraps the Sleepycat Berkeley DB.
+ * 
+ * Developed against 4.3/4.4. No support for prior versions.
+ * 
+ */
+
 #include <bdb.h>
 #include <stdio.h>
 
@@ -96,7 +103,7 @@ static void db_free(t_dbh *dbh)
 
 static void db_mark(t_dbh *dbh)
 {
-  if ( dbh->aproc ) 
+  if ( ! NIL_P(dbh->aproc) ) 
     rb_gc_mark(dbh->aproc);
   if ( dbh->env )
     rb_gc_mark(dbh->env->self);
@@ -159,6 +166,7 @@ VALUE db_init_aux(VALUE obj,t_envh * eh)
   dbh->db=db;
   dbh->self=obj;
   dbh->env=eh;
+  dbh->aproc=Qnil;
   memset(&(dbh->filename),0,FNLEN+1);
 
   if (eh) {
@@ -309,7 +317,7 @@ VALUE db_close(VALUE obj, VALUE vflags)
     raise_error(rv, "db_close failure: %s",db_strerror(rv));
   }
   dbh->db=NULL;
-  dbh->aproc=(VALUE)NULL;
+  dbh->aproc=Qnil;
   if ( dbh->env ) {
     rb_ary_delete(dbh->env->adb,obj);
   }
@@ -1961,6 +1969,13 @@ VALUE txn_set_timeout(VALUE obj, VALUE vtimeout, VALUE vflags)
   return Qtrue;
 }
 
+/*
+ * Document-class: Bdb
+ *
+ * Ruby library that wraps the Sleepycat Berkeley DB.
+ * 
+ * Developed against 4.3/4.4. No support for prior versions.
+ */
 
 void Init_bdb2() {
   fv_call=rb_intern("call");
