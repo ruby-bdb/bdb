@@ -1591,7 +1591,7 @@ VALUE db_stat(VALUE obj, VALUE vtxn, VALUE vflags)
   switch(dbtype) {
 
 #define hs_int(field)			      \
-  rb_iv_set(s_obj,"@field",INT2FIX(su.hstat->field))
+  rb_iv_set(s_obj,"@" #field,INT2FIX(su.hstat->field))
 
   case DB_HASH:
     hs_int(hash_magic);
@@ -1642,7 +1642,7 @@ VALUE db_stat(VALUE obj, VALUE vtxn, VALUE vflags)
     break;
 
 #define qs_int(field)					\
-    rb_iv_set(s_obj,"@field",INT2FIX(su.qstat->field))
+    rb_iv_set(s_obj,"@" #field,INT2FIX(su.qstat->field))
     
   case DB_QUEUE:
     qs_int(qs_magic);		/* Magic number. */
