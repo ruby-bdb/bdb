@@ -1581,7 +1581,11 @@ VALUE db_stat(VALUE obj, VALUE vtxn, VALUE vflags)
   rv=dbh->db->get_type(dbh->db,&dbtype);
   if (rv)
     raise_error(rv,"db_stat %s",db_strerror(rv));
+#if DB_VERSION_MINOR > 2
   rv=dbh->db->stat(dbh->db,txn?txn->txn:NULL,&(su.stat),flags);
+#else
+  rv=dbh->db->stat(dbh->db,&(su.stat),flags);
+#endif
   if (rv)
     raise_error(rv,"db_stat %s",db_strerror(rv));
 
@@ -1632,7 +1636,9 @@ VALUE db_stat(VALUE obj, VALUE vtxn, VALUE vflags)
     bs_int(bt_leaf_pg);		/* Leaf pages. */
     bs_int(bt_dup_pg);		/* Duplicate pages. */
     bs_int(bt_over_pg);		/* Overflow pages. */
+#if DB_VERSION_MINOR > 2
     bs_int(bt_empty_pg);		/* Empty pages. */
+#endif
     bs_int(bt_free);		/* Pages on the free list. */
     bs_int(bt_int_pgfree);	/* Bytes free in internal pages. */
     bs_int(bt_leaf_pgfree);	/* Bytes free in leaf pages. */
