@@ -840,7 +840,7 @@ VALUE db_del(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vflags)
   return Qtrue;
 }
 
-t_dbh *dbassoc[OPEN_MAX];
+t_dbh *dbassoc[LMAXFD];
 VALUE
 assoc_callback2(VALUE *args)
 {

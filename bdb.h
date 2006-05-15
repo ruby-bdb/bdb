@@ -9,11 +9,14 @@
 
 #define NOTXN NULL
 
-#if OPEN_MAX
-#define MAXFD OPEN_MAX
-#elif FOPEN_MAX
-#define MAXFD FOPEN_MAX
+#ifdef OPEN_MAX
+#define LMAXFD OPEN_MAX
 #else
+#ifdef FOPEN_MAX
+#define LMAXFD FOPEN_MAX
+#endif
+#endif
+#ifndef LMAXFD
 #error "No max fd define available."
 #endif
 
