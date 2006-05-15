@@ -9,6 +9,14 @@
 
 #define NOTXN NULL
 
+#if OPEN_MAX
+#define MAXFD OPEN_MAX
+#elif FOPEN_MAX
+#define MAXFD FOPEN_MAX
+#else
+#error "No max fd define available."
+#endif
+
 #define FNLEN 40
 
 #define filename_copy(fp,fv) \
