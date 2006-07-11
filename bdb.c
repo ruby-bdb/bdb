@@ -1561,7 +1561,7 @@ VALUE db_stat(VALUE obj, VALUE vtxn, VALUE vflags)
   u_int32_t flags=0;
   int rv;
   t_dbh *dbh;
-  t_txnh *txn;
+  t_txnh *txn=NULL;
   DBTYPE dbtype;
   union {
     void *stat;
@@ -1847,6 +1847,64 @@ VALUE env_get_tx_max(VALUE obj)
   return INT2FIX(max);
 }
 
+/*
+ * call-seq:
+ * env.set_lk_max_locks(max) -> max
+ *
+ * Set the maximum number of locks in the environment
+ */
+VALUE env_set_lk_max_locks(VALUE obj, VALUE vmax)
+{
+  t_envh *eh;
+  u_int32_t max;
+  int rv;
+
+  max=FIX2UINT(vmax);
+
+  Data_Get_Struct(obj,t_envh,eh);
+  rv=eh->env->set_lk_max_locks(eh->env,max);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_set_lk_max_locks: %s",db_strerror(rv));
+  }
+
+  return vmax;
+}
+
+/*
+ * call-seq:
+ * env.set_lk_max_objects(max) -> max
+ *
+ * Set the maximum number of locks in the environment
+ */
+VALUE env_set_lk_max_objects(VALUE obj, VALUE vmax)
+{
+  t_envh *eh;
+  u_int32_t max;
+  int rv;
+
+  max=FIX2UINT(vmax);
+
+  Data_Get_Struct(obj,t_envh,eh);
+  rv=eh->env->set_lk_max_objects(eh->env,max);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_set_lk_max_objects: %s",db_strerror(rv));
+  }
+
+  return vmax;
+}
+
+VALUE env_report_stderr(VALUE obj)
+{
+  t_envh *eh;
+  u_int32_t max;
+  int rv;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  eh->env->set_errfile(eh->env,stderr);
+
+  return Qtrue;
+}
+
 
 static void txn_finish(t_txnh *txn)
 {
@@ -2059,6 +2117,9 @@ void Init_bdb2() {
   rb_define_method(cEnv,"get_timeout",env_get_timeout,1);
   rb_define_method(cEnv,"set_tx_max",env_set_tx_max,1);
   rb_define_method(cEnv,"get_tx_max",env_get_tx_max,0);
+  rb_define_method(cEnv,"report_stderr",env_report_stderr,0);
+  rb_define_method(cEnv,"set_lk_max_locks",env_set_lk_max_locks,1);
+  rb_define_method(cEnv,"set_lk_max_objects",env_set_lk_max_objects,1);
   
   cTxnStat = rb_define_class_under(mBdb,"TxnStat",rb_cObject);
   rb_define_method(cTxnStat,"[]",stat_aref,1);
