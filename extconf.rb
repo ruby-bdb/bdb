@@ -70,9 +70,13 @@ $stderr.puts("lib_dir=#{lib_dir} inc_dir=#{inc_dir}")
 #end
 
 $libs << " -lpthread"
+case Config::CONFIG["arch"]
+when /solaris2/
+$libs << " -lnsl"
+end
 
-versions=%w(db-4.3 db-4.2)
-locations=%w(/usr/local/lib /opt/local/lib /usr/local/BerkeleyDB.4.3/lib /usr/local/BerkeleyDB.4.2/lib)
+versions=%w(db-4.4 db-4.3 db-4.2)
+locations=%w(/usr/local/lib /opt/local/lib /usr/local/BerkeleyDB.4.3/lib /usr/local/BerkeleyDB.4.2/lib /opt/csw/bdb44/lib)
 until versions.empty?
   (lib_ok=find_library(this_version=versions.shift,'db_create',*locations)) && break
 end
@@ -123,6 +127,7 @@ h_test_locations=%w(
  /usr/local/include
  /opt/local/include
  /usr/local
+ /opt/csw/bdb44/include
 )
 h_test_locations.unshift($dbh_location) if $dbh_location
 message("Header test locations are #{h_test_locations.inspect}\n")
