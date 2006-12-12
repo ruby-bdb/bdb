@@ -281,6 +281,143 @@ VALUE db_flags_set(VALUE obj, VALUE vflags)
   return vflags;
 }
 
+/*
+ * call-seq:
+ *	db.pagesize=value
+ *
+ * set database flags based on DB constants.
+ * see http://www.sleepycat.com/docs/api_c/db_set_flags.html
+ *
+ */
+VALUE db_pagesize_set(VALUE obj, VALUE vpagesize)
+{
+  t_dbh *dbh;
+  int rv;
+  u_int32_t pagesize;
+
+  pagesize=NUM2INT(vpagesize);
+  Data_Get_Struct(obj,t_dbh,dbh);
+  rv = dbh->db->set_pagesize(dbh->db,pagesize);
+  if ( rv != 0 ) {
+    raise_error(rv, "db_pagesize_set failure: %s",db_strerror(rv));
+  }
+  return vpagesize;
+}
+
+/*
+ * call-seq:
+ *	db.pagesize
+ *
+ * set database flags based on DB constants.
+ * see http://www.sleepycat.com/docs/api_c/db_set_flags.html
+ *
+ */
+VALUE db_pagesize(VALUE obj)
+{
+  t_dbh *dbh;
+  int rv;
+  u_int32_t pagesize;
+
+  Data_Get_Struct(obj,t_dbh,dbh);
+  rv = dbh->db->get_pagesize(dbh->db,&pagesize);
+  if ( rv != 0 ) {
+    raise_error(rv, "db_pagesize_get failure: %s",db_strerror(rv));
+  }
+  return INT2NUM(pagesize);
+}
+
+/*
+ * call-seq:
+ *	db.h_ffactor=value
+ *
+ * get hash db fill factor
+ * formula:
+ *         (pagesize - 32) / (average_key_size + average_data_size + 8)
+ *
+ */
+VALUE db_h_ffactor_set(VALUE obj, VALUE vint)
+{
+  t_dbh *dbh;
+  int rv;
+  u_int32_t cint;
+
+  cint=NUM2INT(vint);
+  Data_Get_Struct(obj,t_dbh,dbh);
+  rv = dbh->db->set_h_ffactor(dbh->db,cint);
+  if ( rv != 0 ) {
+    raise_error(rv, "db_h_ffactor_set failure: %s",db_strerror(rv));
+  }
+  return vint;
+}
+
+/*
+ * call-seq:
+ *	db.h_ffactor
+ *
+ * get hash db fill factor
+ * formula:
+ *         (pagesize - 32) / (average_key_size + average_data_size + 8)
+ * see http://www.sleepycat.com/docs/api_c/db_set_flags.html
+ *
+ */
+VALUE db_h_ffactor(VALUE obj)
+{
+  t_dbh *dbh;
+  int rv;
+  u_int32_t cint;
+
+  Data_Get_Struct(obj,t_dbh,dbh);
+  rv = dbh->db->get_h_ffactor(dbh->db,&cint);
+  if ( rv != 0 ) {
+    raise_error(rv, "db_h_ffactor failure: %s",db_strerror(rv));
+  }
+  return INT2NUM(cint);
+}
+/*
+ * call-seq:
+ *	db.h_nelem=value
+ *
+ * set estimate number of elements in hash table
+ * see http://www.sleepycat.com/docs/api_c/db_set_flags.html
+ *
+ */
+VALUE db_h_nelem_set(VALUE obj, VALUE vint)
+{
+  t_dbh *dbh;
+  int rv;
+  u_int32_t cint;
+
+  cint=NUM2INT(vint);
+  Data_Get_Struct(obj,t_dbh,dbh);
+  rv = dbh->db->set_h_nelem(dbh->db,cint);
+  if ( rv != 0 ) {
+    raise_error(rv, "db_h_nelem_set failure: %s",db_strerror(rv));
+  }
+  return vint;
+}
+
+/*
+ * call-seq:
+ *	db.h_nelem
+ *
+ * get estimate number of element in the hash table
+ * see http://www.sleepycat.com/docs/api_c/db_set_flags.html
+ *
+ */
+VALUE db_h_nelem(VALUE obj)
+{
+  t_dbh *dbh;
+  int rv;
+  u_int32_t nelem;
+
+  Data_Get_Struct(obj,t_dbh,dbh);
+  rv = dbh->db->get_h_nelem(dbh->db,&nelem);
+  if ( rv != 0 ) {
+    raise_error(rv, "db_h_nelem failure: %s",db_strerror(rv));
+  }
+  return INT2NUM(nelem);
+}
+
 VALUE dbc_close(VALUE);
 
 /* call-seq:
@@ -1627,7 +1764,9 @@ VALUE db_stat(VALUE obj, VALUE vtxn, VALUE vflags)
     bs_int(bt_nkeys);		/* Number of unique keys. */
     bs_int(bt_ndata);		/* Number of data items. */
     bs_int(bt_pagesize);		/* Page size. */
+#if DB_VERSION_MINOR < 4
     bs_int(bt_maxkey);		/* Maxkey value. */
+#endif
     bs_int(bt_minkey);		/* Minkey value. */
     bs_int(bt_re_len);		/* Fixed-length record length. */
     bs_int(bt_re_pad);		/* Fixed-length record pad. */
@@ -2082,6 +2221,12 @@ void Init_bdb2() {
   rb_define_method(cDb,"remove",db_remove,3);
   rb_define_method(cDb,"key_range",db_key_range,3);
   rb_define_method(cDb,"rename",db_rename,4);
+  rb_define_method(cDb,"pagesize",db_pagesize,0);
+  rb_define_method(cDb,"pagesize=",db_pagesize_set,1);
+  rb_define_method(cDb,"h_ffactor",db_h_ffactor,0);
+  rb_define_method(cDb,"h_ffactor=",db_h_ffactor_set,1);
+  rb_define_method(cDb,"h_nelem",db_h_nelem,0);
+  rb_define_method(cDb,"h_nelem=",db_h_nelem_set,1);
   rb_define_method(cDb,"stat",db_stat,2);
   cDbStat = rb_define_class_under(cDb,"Stat",rb_cObject);
   rb_define_method(cDbStat,"[]",stat_aref,1);
