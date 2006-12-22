@@ -58,7 +58,7 @@ if ri < 1008004
   exit(3)
 end
 
-inc_dir,lib_dir = dir_config(target)
+inc_dir,lib_dir = dir_config(target,$dbh_location)
 
 $stderr.puts("lib_dir=#{lib_dir} inc_dir=#{inc_dir}")
 
