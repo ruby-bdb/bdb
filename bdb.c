@@ -1988,6 +1988,50 @@ VALUE env_get_tx_max(VALUE obj)
 
 /*
  * call-seq:
+ * env.set_shm_key(key) -> max
+ *
+ * Set the shared memory key base
+ */
+VALUE env_set_shm_key(VALUE obj, VALUE vkey)
+{
+  t_envh *eh;
+  long key;
+  int rv;
+
+  key=FIX2UINT(vkey);
+
+  Data_Get_Struct(obj,t_envh,eh);
+  rv=eh->env->set_shm_key(eh->env,key);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_set_shm_key: %s",db_strerror(rv));
+  }
+
+  return vkey;
+}
+
+/*
+ * call-seq
+ * env.get_shm_key -> Fixnum
+ *
+ * Get the current shm key base
+ */
+VALUE env_get_shm_key(VALUE obj)
+{
+  t_envh *eh;
+  long key;
+  int rv;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  rv=eh->env->get_shm_key(eh->env,&key);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_get_shm_key: %s",db_strerror(rv));
+  }
+
+  return INT2FIX(key);
+}
+
+/*
+ * call-seq:
  * env.set_lk_max_locks(max) -> max
  *
  * Set the maximum number of locks in the environment
@@ -2265,6 +2309,8 @@ void Init_bdb2() {
   rb_define_method(cEnv,"report_stderr",env_report_stderr,0);
   rb_define_method(cEnv,"set_lk_max_locks",env_set_lk_max_locks,1);
   rb_define_method(cEnv,"set_lk_max_objects",env_set_lk_max_objects,1);
+  rb_define_method(cEnv,"set_shm_key",env_set_shm_key,1);
+  rb_define_method(cEnv,"get_shm_key",env_get_shm_key,0);
   
   cTxnStat = rb_define_class_under(mBdb,"TxnStat",rb_cObject);
   rb_define_method(cTxnStat,"[]",stat_aref,1);
