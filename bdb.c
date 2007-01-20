@@ -173,7 +173,7 @@ VALUE db_init_aux(VALUE obj,t_envh * eh)
     rb_ary_push(eh->adb,obj);
   }
 
-  dbh->adbc=rb_ary_new();
+  dbh->adbc=Qnil;
     
   return obj;
 }
@@ -244,8 +244,8 @@ VALUE db_open(VALUE obj, VALUE vtxn, VALUE vdisk_file,
     mode=NUM2INT(vmode);
 
   Data_Get_Struct(obj,t_dbh,dbh);
-  if ( NIL_P(dbh->adbc) )
-    raise_error(0,"db handle already used and closed");
+  if ( ! NIL_P(dbh->adbc) )
+    raise_error(0,"db handle already opened");
   
   rv = dbh->db->open(dbh->db,txn?txn->txn:NULL,
 		     StringValueCStr(vdisk_file),
@@ -255,6 +255,8 @@ VALUE db_open(VALUE obj, VALUE vtxn, VALUE vdisk_file,
     raise_error(rv,"db_open failure: %s(%d)",db_strerror(rv),rv);
   }
   filename_copy(dbh->filename,vdisk_file)
+  dbh->adbc=rb_ary_new();
+
   return obj;
 }
 
@@ -437,7 +439,7 @@ VALUE db_close(VALUE obj, VALUE vflags)
   if ( dbh->db==NULL || strlen(dbh->filename)==0 )
     return Qnil;
 
-  if (RARRAY(dbh->adbc)->len > 0 ) {
+  if (! NIL_P(dbh->adbc) && RARRAY(dbh->adbc)->len > 0 ) {
     rb_warning("%s/%d %s",__FILE__,__LINE__,
 	       "cursor handles still open");
     while ( (cur=rb_ary_pop(dbh->adbc)) != Qnil ) {
@@ -458,7 +460,7 @@ VALUE db_close(VALUE obj, VALUE vflags)
   if ( dbh->env ) {
     rb_ary_delete(dbh->env->adb,obj);
   }
-  dbh->adbc=Qnil;
+
   return obj;
 }
 
