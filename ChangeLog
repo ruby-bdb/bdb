@@ -1,0 +1,105 @@
+2007-01-20 16:32  tag R0_8
+
+2007-01-20 16:32  danj
+
+	* bdb.c: resolve #906. Changed cursor management semantics. Should
+	  eliminate SEGV during finalize cleanup
+
+2006-12-21 19:48  danj
+
+	* extconf.rb: make dbh find work a little better with --dbh arg
+
+2006-12-21 19:48  danj
+
+	* bdb.c: add set/get shm key
+
+2006-12-12 11:13  danj
+
+	* extconf.rb: add more berkeley locations
+
+2006-12-12 11:12  danj
+
+	* bdb.c: add hash page controls
+
+2006-07-11 17:02  danj
+
+	* bdb.c: fix db_stat wild pointer for txn
+
+2006-05-15 17:28  tag R0_7
+
+2006-05-15 17:28  danj
+
+	* bdb.c, bdb.h: another cpp fix
+
+2006-05-15 17:22  danj
+
+	* bdb.h: fix for linux
+
+2006-05-15 12:35  tag R0_6
+
+2006-05-15 12:35  danj
+
+	* bdb.h, extconf.rb: expand automagic configuration
+
+2006-05-12 20:41  tag R0_5
+
+2006-05-12 20:41  danj
+
+	* bdb.c: compat for 4.2
+
+2006-05-10 15:03  danj
+
+	* bdb.c: fix hash and queue stat variable creation (macro was
+	  wrong)
+
+2006-05-04 15:45  tag R0_4
+
+2006-05-04 15:45  danj
+
+	* bdb.c: fix aproc initialization
+
+2006-04-24 20:56  tag R0_3
+
+2006-04-24 20:56  danj
+
+	* bdb.c: finished initial round of rdoc
+
+2006-04-24 16:48  danj
+
+	* bdb.c: adding rdoc, unfinished
+
+2006-04-24 15:40  danj
+
+	* bdb.c, extconf.rb: make extconf.rb accept --va so the library can
+	  coexist with bdb2 release prior to transactions. Note, howerver
+	  the two libraries cannot be used at the same time
+
+2006-04-24 14:21  danj
+
+	* bdb.c: add truncate and sync
+
+2006-04-24 14:12  danj
+
+	* bdb.c: status for db and txn
+
+2006-04-21 16:45  danj
+
+	* bdb.c, bdb.h: added transactions, cleanup of finalizers, addition
+	  of pget, in process of adding many other API calls
+
+2006-03-06 12:44  danj
+
+	* bdb.h, extconf.rb: fix solaris install problems
+
+2006-02-13 21:56  tag R0_2
+
+2006-02-13 21:56  danj
+
+	* MANIFEST, bdb.c, bdb.h, extconf.rb, README, status.txt, test.rb:
+	  Initial
+
+2006-02-13 21:56  danj
+
+	* MANIFEST, bdb.c, bdb.h, extconf.rb, README, status.txt, test.rb:
+	  Initial revision
+
