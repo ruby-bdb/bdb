@@ -1,3 +1,31 @@
+20-Jan-2007
+
+ The library is stable. With the 0.8 release, the last known bug has been
+ resolved. The library now has transactions, many more environment
+ management functions (hash params, shm, etc), and open transactions,
+ cursors and databases are tracked and properly cleaned up during finalization,
+ or at least when env.close is called. The library is size stable (no leaks)
+ and is being used in a heavy production environment with great reliability.
+
+ The future:
+
+ There are numerous DB controls that are not yet in the interface, as well
+ as handling sequences and other DB features. There has been no call for
+ them yet, so they linger.
+
+ The build system is a little weak. DB can be installed in so many different
+ places and variety of versions, making version selection tricky. There is
+ a complication, in that it is not enough for the compiler chain to find the
+ db.h and libraries, the build needs to find the exact db.h, because symbols
+ are extracted from it to generate the Ruby-side defines. It would be nice to
+ fix the build process and to turn it into a Gem.
+
+ Numerous, more ruby-like, methods need to be added. Probably in just a .rb
+ file to wrap and increase the ease of use for the core methods. The methods
+ do not deal with variable argument lists as they are largely faithful to
+ the DB API. But methods like cursor#next, cursor#first, and cursor.each
+ are appropriate.
+
 9-Feb-2006
   Done:
    All common environment, database and cursor functions are in. They are also
