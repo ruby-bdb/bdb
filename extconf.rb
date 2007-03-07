@@ -75,7 +75,7 @@ when /solaris2/
 $libs << " -lnsl"
 end
 
-versions=%w(db-4.4 db-4.3 db-4.2)
+versions=%w(db-4.5 db-4.4 db-4.3 db-4.2)
 locations=%w(/usr/local/lib /opt/local/lib /usr/local/BerkeleyDB.4.3/lib /usr/local/BerkeleyDB.4.2/lib /opt/csw/bdb44/lib)
 until versions.empty?
   (lib_ok=find_library(this_version=versions.shift,'db_create',*locations)) && break
@@ -148,7 +148,7 @@ end
 
 unless found
   usage
-  message("\nUnable to find db.h to match library (#{maj}.#{min})\n")
+  message("\nUnable to find db.h to match library (#{$maj}.#{$min})\n")
   exit 4
 end
 
