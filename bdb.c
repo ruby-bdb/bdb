@@ -10,6 +10,7 @@
 
 #define LMEMFLAG 0
 #define NOFLAGS 0
+#undef DEBUG_DB
 
 #ifdef HAVE_STDARG_PROTOTYPES
 #include <stdarg.h>
@@ -90,12 +91,13 @@ static void db_free(t_dbh *dbh)
 {
 #ifdef DEBUG_DB
   if ( RTEST(ruby_debug) )
-    fprintf(stderr,"%s/%d %s 0x%x\n",__FILE__,__LINE__,"db_free cleanup!",p);
+    fprintf(stderr,"%s/%d %s 0x%x\n",__FILE__,__LINE__,"db_free cleanup!",dbh);
 #endif
 
   if ( dbh ) {
     if ( dbh->db && dbh->filename[0]!=0 ) {
       dbh->db->close(dbh->db,NOFLAGS);
+      dbh->db=NULL;
     }
     free(dbh);
   }
@@ -157,7 +159,7 @@ VALUE db_init_aux(VALUE obj,t_envh * eh)
   }
 
 #ifdef DEBUG_DB
-  dbh->db->set_errfile(dbh->db,stderr);
+  db->set_errfile(db,stderr);
 #endif
 
   dbh=ALLOC(t_dbh);
@@ -169,11 +171,14 @@ VALUE db_init_aux(VALUE obj,t_envh * eh)
   dbh->aproc=Qnil;
   memset(&(dbh->filename),0,FNLEN+1);
 
-  if (eh) {
-    rb_ary_push(eh->adb,obj);
-  }
-
   dbh->adbc=Qnil;
+
+  if (dbh->env) {
+#ifdef DEBUG_DB
+    fprintf(stderr,"Adding 0x%x 0x%x\n",obj,dbh);
+#endif
+    rb_ary_push(dbh->env->adb,obj);
+  }
     
   return obj;
 }
@@ -436,7 +441,7 @@ VALUE db_close(VALUE obj, VALUE vflags)
 
   flags=NUM2INT(vflags);
   Data_Get_Struct(obj,t_dbh,dbh);
-  if ( dbh->db==NULL || strlen(dbh->filename)==0 )
+  if ( dbh->db==NULL )
     return Qnil;
 
   if (! NIL_P(dbh->adbc) && RARRAY(dbh->adbc)->len > 0 ) {
@@ -449,15 +454,19 @@ VALUE db_close(VALUE obj, VALUE vflags)
 
   if ( RTEST(ruby_debug) )
     rb_warning("%s/%d %s 0x%x %s",__FILE__,__LINE__,"db_close!",dbh,
-	       dbh->filename);
+	       (dbh->filename==NULL||*(dbh->filename)=='0') ? "unknown" : dbh->filename);
 
   rv = dbh->db->close(dbh->db,flags);
   if ( rv != 0 ) {
+    if ( dbh->env ) {
+      rb_ary_delete(dbh->env->adb,obj);
+    }
     raise_error(rv, "db_close failure: %s",db_strerror(rv));
   }
   dbh->db=NULL;
   dbh->aproc=Qnil;
   if ( dbh->env ) {
+    rb_warning("%s/%d %s 0x%x",__FILE__,__LINE__,"db_close! removing",obj);
     rb_ary_delete(dbh->env->adb,obj);
   }
 
@@ -810,7 +819,8 @@ VALUE db_remove(VALUE obj, VALUE vdisk_file,
 		     NIL_P(vdisk_file)?NULL:StringValueCStr(vdisk_file),
 		     NIL_P(vlogical_db)?NULL:StringValueCStr(vlogical_db),
 		     flags);
-
+  /* handle cannot be accessed again per docs */
+  dbh->db=NULL;
   if (rv)
     raise_error(rv,"db_remove failed: %s",db_strerror(rv));
   return Qtrue;
@@ -1013,6 +1023,11 @@ int assoc_callback(DB *secdb,const DBT* key, const DBT* data, DBT* result)
     rb_warning("return from assoc callback not a string!");
 
   StringValue(retv);
+#ifdef DEBUG_DB
+  fprintf(stderr,"assoc_key %*s for %*s\n",
+	  RSTRING(retv)->len,RSTRING(retv)->ptr,
+	  data->size,data->data);
+#endif
   result->data=RSTRING(retv)->ptr;
   result->size=RSTRING(retv)->len;
   result->flags=LMEMFLAG;
@@ -1337,6 +1352,7 @@ static void env_free(void *p)
   if ( eh ) {
     if ( eh->env ) {
       eh->env->close(eh->env,NOFLAGS);
+      eh->env=NULL;
     }
     free(p);
   }
@@ -1439,11 +1455,14 @@ VALUE env_close(VALUE obj)
     return Qnil;
 
   if (RARRAY(eh->adb)->len > 0) {
-    rb_warning("%s/%d %s",__FILE__,__LINE__,
-	       "database handles still open");
-    while ( (db=rb_ary_pop(eh->adb)) != Qnil ) {
-      db_close(db,INT2FIX(0));
-    }
+    rb_warning("%s/%d %s %d",__FILE__,__LINE__,
+	       "database handles still open",RARRAY(eh->adb)->len);
+    while (RARRAY(eh->adb)->len > 0)
+      if ((db=rb_ary_pop(eh->adb)) != Qnil ) {
+	rb_warning("%s/%d %s 0x%x",__FILE__,__LINE__,
+		   "closing",db);
+	db_close(db,INT2FIX(0));
+      }
   }
   if (RARRAY(eh->atxn)->len > 0) {
     rb_warning("%s/%d %s",__FILE__,__LINE__,
@@ -1457,13 +1476,13 @@ VALUE env_close(VALUE obj)
     rb_warning("%s/%d %s 0x%x",__FILE__,__LINE__,"env_close!",eh);
 
   rv = eh->env->close(eh->env,NOFLAGS);
+  eh->env=NULL;
+  eh->adb=Qnil;
+  eh->atxn=Qnil;
   if ( rv != 0 ) {
     raise_error(rv, "env_close failure: %s",db_strerror(rv));
     return Qnil;
   }
-  eh->env=NULL;
-  eh->adb=Qnil;
-  eh->atxn=Qnil;
   return obj;
 }
 
