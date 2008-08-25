@@ -1616,6 +1616,7 @@ static void txn_free(t_txnh *txn)
     rb_ary_delete(txn->env->atxn,txn->self);
     txn->env=NULL;
   }
+  if (txn) free(txn);
 }
 
 /*
