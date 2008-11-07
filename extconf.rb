@@ -1,65 +1,8 @@
 #!/usr/bin/env ruby
-require 'getoptlong'
 require 'mkmf'
 
-target="bdb2"
-
 $distcleanfiles=["bdb_aux._c"]
-
-
-def usage
-  $stderr.puts "
-
-Options:
-
- --va build an alternate output bdb2a, use this to avoid overwriting a
-      previous bdb2 library, since R0.3 the interfaces are not
-      compatible due to the addition of transaction parameters to many
-      calls. Note the impact on indicating the include, below.
-      If you have not used bdb2 before, you need not use this argument.
-
- --nsl add nsl rpc library to build (4.4 uses rpc for replication)
-
- --usedb berkeley db root
-
- -h,--help this
-
- --dbh {dir for db.h}
-      If we cannot find the right db.h automatically, use this to
-      indicate where to look. Do not use --with... because we need
-      to find the file itself to extract all the DB defines.
-
-"
-end
-
-opts = GetoptLong.new(
-                      [ "--va", GetoptLong::NO_ARGUMENT],
-                      [ "--nsl", GetoptLong::NO_ARGUMENT],
-                      [ "-h","--help",GetoptLong::NO_ARGUMENT],
-                      [ "--usedb", GetoptLong::REQUIRED_ARGUMENT],
-                      [ "--dbh", GetoptLong::REQUIRED_ARGUMENT]
-                      )
-opts.each do |opt,arg|
-  case opt
-  when '--va'
-    target="bdb2a"
-  when '-h','--help'
-    usage
-    exit
-  when '--dbh'
-    $dbh_location=arg
-  when '--nsl'
-    $libs << " -lnsl"
-  when '--usedb'
-    $usedb=arg
-  end
-end
-
-message "Target is #{target}\n"
-
-if CONFIG['INSTALL'] =~ %r{./install-sh}
-  CONFIG.delete("INSTALL")
-end
+dir_config('db')
 
 mj,mi,rv=RUBY_VERSION.split('.').collect {|s| s.to_i}
 ri=(((mj*1000)+mi)*1000)+rv
@@ -68,27 +11,9 @@ if ri < 1008004
   exit(3)
 end
 
-inc_dir,lib_dir = dir_config(target,$dbh_location)
-
-$stderr.puts("lib_dir=#{lib_dir} inc_dir=#{inc_dir}")
-
-
-#case Config::CONFIG["arch"]
-#when /solaris2/
-#  $DLDFLAGS ||= ""
-#  $DLDFLAGS += " -R#{lib_dir}"
-#end
-
-$libs << " -lpthread"
-case Config::CONFIG["arch"]
-when /solaris2/
-$libs << " -lnsl"
-end
-
 versions=%w(db-4.6 db-4.5 db-4.4 db-4.3 db-4.2)
-locations=%w(/usr/local/lib /opt/local/lib /usr/lib)
 until versions.empty?
-  (lib_ok=find_library(this_version=versions.shift,'db_create',*locations)) && break
+  (lib_ok=find_library(this_version=versions.shift,'db_create')) && break
 end
 
 $stderr.puts(this_version)
@@ -106,13 +31,33 @@ SRC
   xpopen("./conftest") do |f|
   $maj,$min=f.gets.chomp.split.collect {|v| v.to_i}
   end
+  libpath=`ldd conftest`.split.find {|e| e =~ %r{/.+#{this_version}} }
+  $stderr.puts("library path #{libpath}")
   rm_f("conftest*")
 else
   message("unable to compile against found DB library\n")
   exit
 end
 
-message("Found DB version #{$maj}.#{$min}\n")
+message("Found DB version #{$maj}.#{$min} in #{libpath}\n")
+
+# lets find its header now
+incpath=libpath
+while incpath!= "/"
+  incpath=File.dirname(incpath)
+  i=File.join(incpath,"include","db.h")
+  if File.exist?(i)
+    incpath=i ; break
+  end
+end
+
+if incpath=="/"
+  message("unable to find db.h")
+  exit
+end
+incpath=File.dirname(incpath)
+
+message("Found db.h in #{incpath}\n")
 
 def check_header dir
   opt=if dir; "-I#{dir}".quote; else nil; end
@@ -134,46 +79,7 @@ def check_header dir
   false
 end
 
-# All systems seem to have a default db.h, so this is more selective
-h_test_locations=%w(
- /usr/local/include
- /opt/local/include
- /usr/local
- /opt/csw/bdb44/include
-)
-h_test_locations.unshift($usedb) if $usedb
-h_test_locations.unshift($dbh_location) if $dbh_location
-message("Header test locations are #{h_test_locations.inspect}\n")
-found=false
-$db_inc=nil
-
-# Find possible headers first:
-require 'find'
-Find.find(*h_test_locations) do |p1|
-  if FileTest.directory?(p1)
-    Find.prune if File.basename(p1)[0] == ?.
-  else
-    if File.basename(p1) == 'db.h'
-      break if found=check_header(File.dirname(p1))
-    end
-  end
-end
-
-unless found
-  usage
-  message("\nUnable to find db.h to match library (#{$maj}.#{$min})\n")
-  exit 4
-end
-
-# This is an alternate way of find headers, by makedepend
-# support of gcc. It is not as necessary as we could just use
-# the above result, but it is another check.
-# Find db.h, not sure this will work everywhere, gcc is ok
-src=create_tmpsrc("#include <db.h>")
-cmd=cpp_command(RUBY_PLATFORM =~ /mswin/ ? nil : "-M")
-r=`#{cmd}`
-header_loc=r.split.collect {|k| k if k =~ %r{^/.*db.h} }.compact[0]
-message("header is #{header_loc}\n")
+exit unless check_header(incpath)
 
 inc="#include <db.h>"
 n=0
@@ -198,7 +104,6 @@ File.open(File.join($db_inc,"db.h")) {|fd|
             $stderr.puts "don't know how to handle #{name} #{value}, guessing UINT"
             hd.print(%Q{    cu(mBdb,%s);\n}%[name])
           end
-          message(".")
           n+=1
         end
       end
@@ -211,8 +116,7 @@ $defs << $INCFLAGS
 
 if lib_ok
   create_header
-  create_makefile(target)
+  create_makefile('bdb2')
 else
   $stderr.puts("cannot create Makefile")
 end
-

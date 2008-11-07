@@ -3,6 +3,19 @@
 #define BDB2_H
 
 #include <ruby.h>
+
+#ifdef stat
+  #undef stat
+#endif
+
+#ifdef close
+  #undef close
+#endif
+
+#ifdef rename
+  #undef rename
+#endif
+
 #include <version.h>
 #include <extconf.h>
 #include <db.h>
