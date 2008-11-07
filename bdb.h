@@ -23,7 +23,7 @@
 #define FNLEN 40
 
 #define filename_copy(fp,fv) \
-  strncpy(fp,RSTRING(fv)->ptr,FNLEN);
+  strncpy(fp,RSTRING_PTR(fv),FNLEN);
 
 #define filename_dup(fpd,fps) \
   strncpy(fpd,fps,FNLEN);
@@ -57,8 +57,11 @@ typedef struct s_txnh {
   t_envh *env;
 } t_txnh;
 
-#define ci(b,m)				\
-  rb_define_const(b,#m,INT2FIX(m))
+#define cu(b,m)             \
+  rb_define_const(b,#m,UINT2NUM(m))
+
+#define ci(b,m)             \
+  rb_define_const(b,#m,INT2NUM(m))
 
 #define cs(b,m) \
   rb_define_const(b,#m,rb_str_new2(m))

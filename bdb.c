@@ -74,7 +74,7 @@ VALUE err_initialize(VALUE obj, VALUE message, VALUE code)
   VALUE args[1];
   args[0]=message;
   rb_call_super(1,args);
-  rb_ivar_set(obj,fv_err_code,code);
+  return rb_ivar_set(obj,fv_err_code,code);
 }
 
 /*
@@ -95,8 +95,11 @@ static void db_free(t_dbh *dbh)
 #endif
 
   if ( dbh ) {
-    if ( dbh->db && dbh->filename[0]!=0 ) {
+    if (dbh->db) {
       dbh->db->close(dbh->db,NOFLAGS);
+      if ( RTEST(ruby_debug) && dbh->filename[0] != '\0')
+    fprintf(stderr,"%s/%d %s %p %s\n",__FILE__,__LINE__,
+        "db_free database was still open!",dbh->db,dbh->filename);
       dbh->db=NULL;
     }
     free(dbh);
@@ -105,6 +108,7 @@ static void db_free(t_dbh *dbh)
 
 static void db_mark(t_dbh *dbh)
 {
+  if ( dbh == NULL ) return;
   if ( ! NIL_P(dbh->aproc) ) 
     rb_gc_mark(dbh->aproc);
   if ( dbh->env )
@@ -133,8 +137,8 @@ static void dbc_free(void *p)
     if ( dbch->dbc ) {
       dbch->dbc->c_close(dbch->dbc);
       if ( RTEST(ruby_debug) )
-	fprintf(stderr,"%s/%d %s 0x%x %s\n",__FILE__,__LINE__,
-		"dbc_free cursor was still open!",p,dbch->filename);
+    fprintf(stderr,"%s/%d %s %p %s\n",__FILE__,__LINE__,
+        "dbc_free cursor was still open!",p,dbch->filename);
     }
     free(p);
   }
@@ -163,7 +167,11 @@ VALUE db_init_aux(VALUE obj,t_envh * eh)
 #endif
 
   dbh=ALLOC(t_dbh);
-  db_free(DATA_PTR(obj));
+  if (DATA_PTR(obj)) {
+      /* if called from env_db, the data ptr has not been allocated,
+       * was freeing 0x0 */
+      db_free(DATA_PTR(obj));
+  }
   DATA_PTR(obj)=dbh;
   dbh->db=db;
   dbh->self=obj;
@@ -175,7 +183,7 @@ VALUE db_init_aux(VALUE obj,t_envh * eh)
 
   if (dbh->env) {
 #ifdef DEBUG_DB
-    fprintf(stderr,"Adding 0x%x 0x%x\n",obj,dbh);
+    fprintf(stderr,"Adding db to env 0x%x 0x%x\n",obj,dbh);
 #endif
     rb_ary_push(dbh->env->adb,obj);
   }
@@ -224,12 +232,15 @@ VALUE db_open(VALUE obj, VALUE vtxn, VALUE vdisk_file,
   int mode=0;
 
   if ( ! NIL_P(vflags) )
-    flags=NUM2INT(vflags);
+    flags=NUM2UINT(vflags);
 
-  if ( ! NIL_P(vtxn) )
+  if ( ! NIL_P(vtxn) ) {
     Data_Get_Struct(vtxn,t_txnh,txn);
+    if (!txn->txn)
+        raise(0, "txn is closed");
+  }
 
-  if ( TYPE(vlogical_db)==T_STRING && RSTRING(vlogical_db)->len > 0 )
+  if ( TYPE(vlogical_db)==T_STRING && RSTRING_LEN(vlogical_db) > 0 )
     logical_db=StringValueCStr(vlogical_db);
     
   if ( FIXNUM_P(vdbtype) ) {
@@ -240,7 +251,7 @@ VALUE db_open(VALUE obj, VALUE vtxn, VALUE vdisk_file,
     }
   }
 
-  if ( TYPE(vdisk_file)!=T_STRING || RSTRING(vdisk_file)->len < 1 ) {
+  if ( TYPE(vdisk_file)!=T_STRING || RSTRING_LEN(vdisk_file) < 1 ) {
     raise_error(0,"db_open Bad disk file name");
     return Qnil;
   }
@@ -279,8 +290,11 @@ VALUE db_flags_set(VALUE obj, VALUE vflags)
   int rv;
   u_int32_t flags;
 
-  flags=NUM2INT(vflags);
+  flags=NUM2UINT(vflags);
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise_error(0,"db is closed");
+
   rv = dbh->db->set_flags(dbh->db,flags);
   if ( rv != 0 ) {
     raise_error(rv, "db_flag_set failure: %s",db_strerror(rv));
@@ -304,6 +318,8 @@ VALUE db_pagesize_set(VALUE obj, VALUE vpagesize)
 
   pagesize=NUM2INT(vpagesize);
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise_error(0,"db is closed");
   rv = dbh->db->set_pagesize(dbh->db,pagesize);
   if ( rv != 0 ) {
     raise_error(rv, "db_pagesize_set failure: %s",db_strerror(rv));
@@ -326,6 +342,8 @@ VALUE db_pagesize(VALUE obj)
   u_int32_t pagesize;
 
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise_error(0,"db is closed");
   rv = dbh->db->get_pagesize(dbh->db,&pagesize);
   if ( rv != 0 ) {
     raise_error(rv, "db_pagesize_get failure: %s",db_strerror(rv));
@@ -350,6 +368,8 @@ VALUE db_h_ffactor_set(VALUE obj, VALUE vint)
 
   cint=NUM2INT(vint);
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise_error(0,"db is closed");
   rv = dbh->db->set_h_ffactor(dbh->db,cint);
   if ( rv != 0 ) {
     raise_error(rv, "db_h_ffactor_set failure: %s",db_strerror(rv));
@@ -374,6 +394,8 @@ VALUE db_h_ffactor(VALUE obj)
   u_int32_t cint;
 
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise_error(0,"db is closed");
   rv = dbh->db->get_h_ffactor(dbh->db,&cint);
   if ( rv != 0 ) {
     raise_error(rv, "db_h_ffactor failure: %s",db_strerror(rv));
@@ -396,6 +418,8 @@ VALUE db_h_nelem_set(VALUE obj, VALUE vint)
 
   cint=NUM2INT(vint);
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise_error(0,"db is closed");
   rv = dbh->db->set_h_nelem(dbh->db,cint);
   if ( rv != 0 ) {
     raise_error(rv, "db_h_nelem_set failure: %s",db_strerror(rv));
@@ -418,6 +442,8 @@ VALUE db_h_nelem(VALUE obj)
   u_int32_t nelem;
 
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise_error(0,"db is closed");
   rv = dbh->db->get_h_nelem(dbh->db,&nelem);
   if ( rv != 0 ) {
     raise_error(rv, "db_h_nelem failure: %s",db_strerror(rv));
@@ -439,7 +465,7 @@ VALUE db_close(VALUE obj, VALUE vflags)
   u_int32_t flags;
   VALUE cur;
 
-  flags=NUM2INT(vflags);
+  flags=NUM2UINT(vflags);
   Data_Get_Struct(obj,t_dbh,dbh);
   if ( dbh->db==NULL )
     return Qnil;
@@ -457,17 +483,15 @@ VALUE db_close(VALUE obj, VALUE vflags)
 	       (dbh->filename==NULL||*(dbh->filename)=='0') ? "unknown" : dbh->filename);
 
   rv = dbh->db->close(dbh->db,flags);
-  if ( rv != 0 ) {
-    if ( dbh->env ) {
-      rb_ary_delete(dbh->env->adb,obj);
-    }
-    raise_error(rv, "db_close failure: %s",db_strerror(rv));
-  }
   dbh->db=NULL;
   dbh->aproc=Qnil;
   if ( dbh->env ) {
     rb_warning("%s/%d %s 0x%x",__FILE__,__LINE__,"db_close! removing",obj);
     rb_ary_delete(dbh->env->adb,obj);
+    dbh->env = NULL;
+  }
+  if ( rv != 0 ) {
+    raise_error(rv, "db_close failure: %s",db_strerror(rv));
   }
 
   return obj;
@@ -492,22 +516,27 @@ VALUE db_put(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vdata, VALUE vflags)
   memset(&key,0,sizeof(DBT));
   memset(&data,0,sizeof(DBT));
 
-  if ( ! NIL_P(vtxn) )
+  if ( ! NIL_P(vtxn) ) {
     Data_Get_Struct(vtxn,t_txnh,txn);
-  
+    if (!txn->txn)
+        raise(0, "txn is closed");
+  }
+
   if ( ! NIL_P(vflags) )
-    flags=NUM2INT(vflags);
+    flags=NUM2UINT(vflags);
 
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise_error(0,"db is closed");
 
   StringValue(vkey);
-  key.data = RSTRING(vkey)->ptr;
-  key.size = RSTRING(vkey)->len;
+  key.data = RSTRING_PTR(vkey);
+  key.size = RSTRING_LEN(vkey);
   key.flags = LMEMFLAG;
 
   StringValue(vdata);
-  data.data = RSTRING(vdata)->ptr;
-  data.size = RSTRING(vdata)->len;
+  data.data = RSTRING_PTR(vdata);
+  data.size = RSTRING_LEN(vdata);
   data.flags = LMEMFLAG;
 
   rv = dbh->db->put(dbh->db,txn?txn->txn:NULL,&key,&data,flags);
@@ -541,26 +570,31 @@ VALUE db_get(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vdata, VALUE vflags)
   memset(&key,0,sizeof(DBT));
   memset(&data,0,sizeof(DBT));
 
-  if ( ! NIL_P(vtxn) )
+  if ( ! NIL_P(vtxn) ) {
     Data_Get_Struct(vtxn,t_txnh,txn);
+    if (!txn->txn)
+        raise(0, "txn is closed");
+  }
 
   if ( ! NIL_P(vflags) ) {
     rb_warning("flags nil");
-    flags=NUM2INT(vflags);
+    flags=NUM2UINT(vflags);
   }
   
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise_error(0,"db is closed");
 
   StringValue(vkey);
 
-  key.data = RSTRING(vkey)->ptr;
-  key.size = RSTRING(vkey)->len;
+  key.data = RSTRING_PTR(vkey);
+  key.size = RSTRING_LEN(vkey);
   key.flags = LMEMFLAG;
 
   if ( ! NIL_P(vdata) ) {
     StringValue(vdata);
-    data.data = RSTRING(vdata)->ptr;
-    data.size = RSTRING(vdata)->len;
+    data.data = RSTRING_PTR(vdata);
+    data.size = RSTRING_LEN(vdata);
     data.flags = LMEMFLAG;
   }
 
@@ -596,26 +630,31 @@ VALUE db_pget(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vdata, VALUE vflags)
   memset(&data,0,sizeof(DBT));
   memset(&pkey,0,sizeof(DBT));
 
-  if ( ! NIL_P(vtxn) )
+  if ( ! NIL_P(vtxn) ) {
     Data_Get_Struct(vtxn,t_txnh,txn);
+    if (!txn->txn)
+        raise(0, "txn is closed");
+  }
 
   if ( ! NIL_P(vflags) ) {
     rb_warning("flags nil");
-    flags=NUM2INT(vflags);
+    flags=NUM2UINT(vflags);
   }
   
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise(0, "db is closed");
 
   StringValue(vkey);
 
-  key.data = RSTRING(vkey)->ptr;
-  key.size = RSTRING(vkey)->len;
+  key.data = RSTRING_PTR(vkey);
+  key.size = RSTRING_LEN(vkey);
   key.flags = LMEMFLAG;
 
   if ( ! NIL_P(vdata) ) {
     StringValue(vdata);
-    data.data = RSTRING(vdata)->ptr;
-    data.size = RSTRING(vdata)->len;
+    data.data = RSTRING_PTR(vdata);
+    data.size = RSTRING_LEN(vdata);
     data.flags = LMEMFLAG;
   }
 
@@ -670,17 +709,20 @@ VALUE db_join(VALUE obj, VALUE vacurs, VALUE vflags)
 {
   t_dbh *dbh;
   t_dbch *dbch;
-  int flags;
+  u_int32_t flags;
   DBC **curs;
   int i,rv;
   VALUE jcurs;
 
-  flags=NUM2INT(vflags);
+  flags=NUM2UINT(vflags);
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise(0, "db is closed");
 
   curs = ALLOCA_N(DBC *,RARRAY(vacurs)->len);
   for (i=0; i<RARRAY(vacurs)->len; i++) {
     Data_Get_Struct(RARRAY(vacurs)->ptr[i],t_dbch,dbch);
+    /* cursor is closed? */
     curs[i]=dbch->dbc;
   }
   curs[i]=NULL;
@@ -711,13 +753,15 @@ VALUE db_compact(VALUE obj, VALUE vtxn, VALUE vstart_key,
 		 VALUE vflags)
 {
   t_dbh *dbh;
-  int flags;
+  u_int32_t flags;
   t_txnh *txn=NULL;
   DBT start_key, stop_key, end_key;
   int rv;
 
-  flags=NUM2INT(vflags);
+  flags=NUM2UINT(vflags);
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise(0, "db is closed");
 
   memset(&start_key,0,sizeof(DBT));
   memset(&stop_key,0,sizeof(DBT));
@@ -725,18 +769,21 @@ VALUE db_compact(VALUE obj, VALUE vtxn, VALUE vstart_key,
 
   if ( ! NIL_P(vstart_key) ) {
     StringValue(vstart_key);
-    start_key.data=RSTRING(vstart_key)->ptr;
-    start_key.size=RSTRING(vstart_key)->len;
+    start_key.data=RSTRING_PTR(vstart_key);
+    start_key.size=RSTRING_LEN(vstart_key);
     start_key.flags= LMEMFLAG;
   }
   if ( ! NIL_P(vstop_key) ) {
     StringValue(vstop_key);
-    stop_key.data=RSTRING(vstop_key)->ptr;
-    stop_key.size=RSTRING(vstop_key)->len;
+    stop_key.data=RSTRING_PTR(vstop_key);
+    stop_key.size=RSTRING_LEN(vstop_key);
     stop_key.flags= LMEMFLAG;
   }
-  if ( ! NIL_P(vtxn) )
+  if ( ! NIL_P(vtxn) ) {
     Data_Get_Struct(vtxn,t_txnh,txn);
+    if (!txn->txn)
+        raise(0, "txn is closed");
+  }
 
   rv=dbh->db->compact(dbh->db,txn?txn->txn:NULL,
 		      &start_key,
@@ -766,6 +813,8 @@ VALUE db_get_byteswapped(VALUE obj)
   int is_swapped;
 
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise(0, "db is closed");
   rv=dbh->db->get_byteswapped(dbh->db,&is_swapped);
   if (rv)
     raise_error(rv,"db_get_byteswapped failed: %s",db_strerror(rv));
@@ -788,6 +837,8 @@ VALUE db_get_type(VALUE obj)
   DBTYPE dbtype;
 
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise(0, "db is closed");
   rv=dbh->db->get_type(dbh->db,&dbtype);
   if (rv)
     raise_error(rv,"db_get_type failed: %s",db_strerror(rv));
@@ -812,9 +863,11 @@ VALUE db_remove(VALUE obj, VALUE vdisk_file,
   char *logical_db=NULL;
 
   if ( ! NIL_P(vflags) )
-    flags=NUM2INT(vflags);
+    flags=NUM2UINT(vflags);
 
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise(0, "db is closed");
   rv=dbh->db->remove(dbh->db,
 		     NIL_P(vdisk_file)?NULL:StringValueCStr(vdisk_file),
 		     NIL_P(vlogical_db)?NULL:StringValueCStr(vlogical_db),
@@ -842,12 +895,14 @@ VALUE db_rename(VALUE obj, VALUE vdisk_file,
   char *logical_db=NULL;
 
   if ( ! NIL_P(vflags) )
-    flags=NUM2INT(vflags);
+    flags=NUM2UINT(vflags);
 
   if ( NIL_P(newname) )
     raise_error(0,"db_rename newname must be specified");
 
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise(0, "db is closed");
   rv=dbh->db->rename(dbh->db,
 		     NIL_P(vdisk_file)?NULL:StringValueCStr(vdisk_file),
 		     NIL_P(vlogical_db)?NULL:StringValueCStr(vlogical_db),
@@ -871,6 +926,8 @@ VALUE db_sync(VALUE obj)
   int rv;
 
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise(0, "db is closed");
   rv=dbh->db->sync(dbh->db,NOFLAGS);
 
   if (rv)
@@ -893,10 +950,15 @@ VALUE db_truncate(VALUE obj, VALUE vtxn)
   VALUE result;
   u_int32_t count;
 
-  if ( ! NIL_P(vtxn) )
+  if ( ! NIL_P(vtxn) ) {
     Data_Get_Struct(vtxn,t_txnh,txn);
-  
+    if (!txn->txn)
+        raise(0, "txn is closed");
+  }
+
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise(0, "db is closed");
 
   rv=dbh->db->truncate(dbh->db,txn?txn->txn:NULL,&count,NOFLAGS);
   if (rv)
@@ -923,18 +985,23 @@ VALUE db_key_range(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vflags)
   DB_KEY_RANGE key_range;
   VALUE result;
 
-  if ( ! NIL_P(vtxn) )
+  if ( ! NIL_P(vtxn) ) {
     Data_Get_Struct(vtxn,t_txnh,txn);
-  
+    if (!txn->txn)
+        raise(0, "txn is closed");
+  }
+
   if ( ! NIL_P(vflags) )
-    flags=NUM2INT(vflags);
+    flags=NUM2UINT(vflags);
 
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise(0, "db is closed");
 
   memset(&key,0,sizeof(DBT));
   StringValue(vkey);
-  key.data = RSTRING(vkey)->ptr;
-  key.size = RSTRING(vkey)->len;
+  key.data = RSTRING_PTR(vkey);
+  key.size = RSTRING_LEN(vkey);
   key.flags = LMEMFLAG;
 
   rv=dbh->db->key_range(dbh->db,txn?txn->txn:NULL,&key,
@@ -969,15 +1036,20 @@ VALUE db_del(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vflags)
 
   memset(&key,0,sizeof(DBT));
 
-  if ( ! NIL_P(vtxn) )
+  if ( ! NIL_P(vtxn) ) {
     Data_Get_Struct(vtxn,t_txnh,txn);
+    if (!txn->txn)
+        raise(0, "txn is closed");
+  }
 
-  flags=NUM2INT(vflags);
+  flags=NUM2UINT(vflags);
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise(0, "db is closed");
 
   StringValue(vkey);
-  key.data = RSTRING(vkey)->ptr;
-  key.size = RSTRING(vkey)->len;
+  key.data = RSTRING_PTR(vkey);
+  key.size = RSTRING_LEN(vkey);
   key.flags = LMEMFLAG;
 
   rv = dbh->db->del(dbh->db,txn?txn->txn:NULL,&key,flags);
@@ -993,7 +1065,7 @@ t_dbh *dbassoc[LMAXFD];
 VALUE
 assoc_callback2(VALUE *args)
 {
-  rb_funcall(args[0],fv_call,3,args[1],args[2],args[3]);
+  return rb_funcall(args[0],fv_call,3,args[1],args[2],args[3]);
 }
 
 int assoc_callback(DB *secdb,const DBT* key, const DBT* data, DBT* result)
@@ -1025,11 +1097,11 @@ int assoc_callback(DB *secdb,const DBT* key, const DBT* data, DBT* result)
   StringValue(retv);
 #ifdef DEBUG_DB
   fprintf(stderr,"assoc_key %*s for %*s\n",
-	  RSTRING(retv)->len,RSTRING(retv)->ptr,
-	  data->size,data->data);
+      RSTRING_LEN(retv),RSTRING_PTR(retv),
+      data->size,data->data);
 #endif
-  result->data=RSTRING(retv)->ptr;
-  result->size=RSTRING(retv)->len;
+  result->data=RSTRING_PTR(retv);
+  result->size=RSTRING_LEN(retv);
   result->flags=LMEMFLAG;
   return 0;
 }
@@ -1061,12 +1133,19 @@ VALUE db_associate(VALUE obj, VALUE vtxn, VALUE osecdb,
   int fdp;
   t_txnh *txn=NOTXN;
 
-  flags=NUM2INT(vflags);
+  flags=NUM2UINT(vflags);
   Data_Get_Struct(obj,t_dbh,pdbh);
+  if (!pdbh->db)
+    raise(0, "db is closed");
   Data_Get_Struct(osecdb,t_dbh,sdbh);
-  
-  if ( ! NIL_P(vtxn) )
+  if (!sdbh->db)
+    raise(0, "sdb is closed");
+
+  if ( ! NIL_P(vtxn) ) {
     Data_Get_Struct(vtxn,t_txnh,txn);
+    if (!txn->txn)
+        raise(0, "txn is closed");
+  }
 
   if ( cb_proc == Qnil ) {
     rb_warning("db_associate: no association may be applied");
@@ -1119,13 +1198,18 @@ VALUE db_cursor(VALUE obj, VALUE vtxn, VALUE vflags)
   VALUE c_obj;
   t_dbch *dbch;
 
-  flags=NUM2INT(vflags);
+  flags=NUM2UINT(vflags);
   Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise(0, "db is closed");
 
   c_obj=Data_Make_Struct(cCursor, t_dbch, dbc_mark, dbc_free, dbch);
 
-  if ( ! NIL_P(vtxn) )
+  if ( ! NIL_P(vtxn) ) {
     Data_Get_Struct(vtxn,t_txnh,txn);
+    if (!txn->txn)
+        raise(0, "txn is closed");
+  }
 
   rv=dbh->db->cursor(dbh->db,txn?txn->txn:NULL,&(dbch->dbc),flags);
   if (rv)
@@ -1151,12 +1235,11 @@ VALUE dbc_close(VALUE obj)
   Data_Get_Struct(obj,t_dbch,dbch);
   if ( dbch->dbc ) {
     rv=dbch->dbc->c_close(dbch->dbc);
-    if (rv)
-      raise_error(rv,"dbc_close: %s",db_strerror(rv));
-
     rb_ary_delete(dbch->db->adbc,obj);
     dbch->db=NULL;
     dbch->dbc=NULL;
+    if (rv)
+      raise_error(rv,"dbc_close: %s",db_strerror(rv));
   }
   return Qnil;
 }
@@ -1175,22 +1258,24 @@ VALUE dbc_get(VALUE obj, VALUE vkey, VALUE vdata, VALUE vflags)
   VALUE rar;
   int rv;
 
-  flags=NUM2INT(vflags);
+  flags=NUM2UINT(vflags);
   Data_Get_Struct(obj,t_dbch,dbch);
+  if (!dbch->dbc)
+    raise(0, "dbc is closed");
 
   memset(&key,0,sizeof(DBT));
   memset(&data,0,sizeof(DBT));
 
   if ( ! NIL_P(vkey) ) {
     StringValue(vkey);
-    key.data = RSTRING(vkey)->ptr;
-    key.size = RSTRING(vkey)->len;
+    key.data = RSTRING_PTR(vkey);
+    key.size = RSTRING_LEN(vkey);
     key.flags = LMEMFLAG;
   }
   if ( ! NIL_P(vdata) ) {
     StringValue(vdata);
-    data.data = RSTRING(vdata)->ptr;
-    data.size = RSTRING(vdata)->len;
+    data.data = RSTRING_PTR(vdata);
+    data.size = RSTRING_LEN(vdata);
     data.flags = LMEMFLAG;
   }
 
@@ -1220,8 +1305,10 @@ VALUE dbc_pget(VALUE obj, VALUE vkey, VALUE vdata, VALUE vflags)
   VALUE rar;
   int rv;
 
-  flags=NUM2INT(vflags);
+  flags=NUM2UINT(vflags);
   Data_Get_Struct(obj,t_dbch,dbch);
+  if (!dbch->dbc)
+    raise(0, "dbc is closed");
 
   memset(&key,0,sizeof(DBT));
   memset(&data,0,sizeof(DBT));
@@ -1229,14 +1316,14 @@ VALUE dbc_pget(VALUE obj, VALUE vkey, VALUE vdata, VALUE vflags)
 
   if ( ! NIL_P(vkey) ) {
     StringValue(vkey);
-    key.data = RSTRING(vkey)->ptr;
-    key.size = RSTRING(vkey)->len;
+    key.data = RSTRING_PTR(vkey);
+    key.size = RSTRING_LEN(vkey);
     key.flags = LMEMFLAG;
   }
   if ( ! NIL_P(vdata) ) {
     StringValue(vdata);
-    data.data = RSTRING(vdata)->ptr;
-    data.size = RSTRING(vdata)->len;
+    data.data = RSTRING_PTR(vdata);
+    data.size = RSTRING_LEN(vdata);
     data.flags = LMEMFLAG;
   }
 
@@ -1271,22 +1358,24 @@ VALUE dbc_put(VALUE obj, VALUE vkey, VALUE vdata, VALUE vflags)
   if ( NIL_P(vdata) )
     raise_error(0,"data element is required for put");
 
-  flags=NUM2INT(vflags);
+  flags=NUM2UINT(vflags);
   Data_Get_Struct(obj,t_dbch,dbch);
+  if (!dbch->dbc)
+    raise(0, "dbc is closed");
 
   memset(&key,0,sizeof(DBT));
   memset(&data,0,sizeof(DBT));
 
   if ( ! NIL_P(vkey) ) {
     StringValue(vkey);
-    key.data = RSTRING(vkey)->ptr;
-    key.size = RSTRING(vkey)->len;
+    key.data = RSTRING_PTR(vkey);
+    key.size = RSTRING_LEN(vkey);
     key.flags = LMEMFLAG;
   }
 
   StringValue(vdata);
-  data.data = RSTRING(vdata)->ptr;
-  data.size = RSTRING(vdata)->len;
+  data.data = RSTRING_PTR(vdata);
+  data.size = RSTRING_LEN(vdata);
   data.flags = LMEMFLAG;
 
   rv = dbch->dbc->c_put(dbch->dbc,&key,&data,flags);
@@ -1310,6 +1399,8 @@ VALUE dbc_del(VALUE obj)
   int rv;
 
   Data_Get_Struct(obj,t_dbch,dbch);
+  if (!dbch->dbc)
+    raise(0, "dbc is closed");
   rv = dbch->dbc->c_del(dbch->dbc,NOFLAGS);
   if (rv == DB_KEYEMPTY)
     return Qnil;
@@ -1332,6 +1423,8 @@ VALUE dbc_count(VALUE obj)
   db_recno_t count;
 
   Data_Get_Struct(obj,t_dbch,dbch);
+  if (!dbch->dbc)
+    raise(0, "dbc is closed");
   rv = dbch->dbc->c_count(dbch->dbc,&count,NOFLAGS);
   if (rv != 0)
     raise_error(rv, "db_count failure: %s",db_strerror(rv));
@@ -1385,7 +1478,7 @@ VALUE env_new(VALUE class, VALUE vflags)
   VALUE obj;
 
   if ( ! NIL_P(vflags) )
-    flags=NUM2INT(vflags);
+    flags=NUM2UINT(vflags);
 
   obj=Data_Make_Struct(class,t_envh,env_mark,env_free,eh);
   rv=db_env_create(&(eh->env),flags);
@@ -1414,10 +1507,12 @@ VALUE env_open(VALUE obj, VALUE vhome, VALUE vflags, VALUE vmode)
   int mode=0;
 
   if ( ! NIL_P(vflags) )
-    flags=NUM2INT(vflags);
+    flags=NUM2UINT(vflags);
   if ( ! NIL_P(vmode) )
     mode=NUM2INT(vmode);
   Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
   if ( NIL_P(eh->adb) )
     raise_error(0,"env handle already used and closed");
 
@@ -1459,15 +1554,17 @@ VALUE env_close(VALUE obj)
 	       "database handles still open",RARRAY(eh->adb)->len);
     while (RARRAY(eh->adb)->len > 0)
       if ((db=rb_ary_pop(eh->adb)) != Qnil ) {
-	rb_warning("%s/%d %s 0x%x",__FILE__,__LINE__,
-		   "closing",db);
-	db_close(db,INT2FIX(0));
+    rb_warning("%s/%d %s 0x%x",__FILE__,__LINE__,
+           "closing",db);
+      /* this could raise! needs rb_protect */
+    db_close(db,INT2FIX(0));
       }
   }
   if (RARRAY(eh->atxn)->len > 0) {
     rb_warning("%s/%d %s",__FILE__,__LINE__,
 	       "database transactions still open");
     while ( (db=rb_ary_pop(eh->atxn)) != Qnil ) {
+      /* this could raise! needs rb_protect */
       txn_abort(db);
     }
   }
@@ -1498,6 +1595,8 @@ VALUE env_db(VALUE obj)
   VALUE dbo;
 
   Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
   dbo = Data_Wrap_Struct(cDb,db_mark,db_free,0);
 
   return db_init_aux(dbo,eh);
@@ -1518,6 +1617,8 @@ VALUE env_set_cachesize(VALUE obj, VALUE size)
   u_int32_t bytes=0,gbytes=0;
   int rv;
   Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
 
   if ( TYPE(size) == T_BIGNUM ) {
     ln = rb_big2ull(size);
@@ -1547,8 +1648,10 @@ VALUE env_set_flags(VALUE obj, VALUE vflags, int onoff)
   u_int32_t flags;
 
   Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
   if ( ! NIL_P(vflags) ) {
-    flags=NUM2INT(vflags);
+    flags=NUM2UINT(vflags);
 
     rv=eh->env->set_flags(eh->env,flags,onoff);
 
@@ -1597,6 +1700,8 @@ VALUE env_list_dbs(VALUE obj)
 {
   t_envh *eh;
   Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
   return eh->adb;
 }
 static void txn_mark(t_txnh *txn)
@@ -1606,17 +1711,22 @@ static void txn_mark(t_txnh *txn)
 }
 static void txn_free(t_txnh *txn)
 {
+#ifdef DEBUG_DB
   if ( RTEST(ruby_debug) )
-    fprintf(stderr,"%s/%d %s 0x%x\n",__FILE__,__LINE__,"txn_free",txn);
+    fprintf(stderr,"%s/%d %s %p\n",__FILE__,__LINE__,"txn_free",txn);
+#endif
 
-  if (txn && txn->txn) {
+  if (txn) {
     if (txn->txn)
       txn->txn->abort(txn->txn);
     txn->txn=NULL;
-    rb_ary_delete(txn->env->atxn,txn->self);
+    if (txn->env) {
+        rb_ary_delete(txn->env->atxn,txn->self);
+    }
     txn->env=NULL;
+
+    free(txn);
   }
-  if (txn) free(txn);
 }
 
 /*
@@ -1634,11 +1744,16 @@ VALUE env_txn_begin(VALUE obj, VALUE vtxn_parent, VALUE vflags)
   VALUE t_obj;
 
   if ( ! NIL_P(vflags))
-    flags=NUM2INT(vflags);
-  if ( ! NIL_P(vtxn_parent) )
+    flags=NUM2UINT(vflags);
+  if ( ! NIL_P(vtxn_parent) ) {
     Data_Get_Struct(vtxn_parent,t_txnh,parent);
+    if (!parent->txn)
+        raise(0, "parent txn is closed");
+  }
 
   Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
   t_obj=Data_Make_Struct(cTxn,t_txnh,txn_mark,txn_free,txn);
 
   rv=eh->env->txn_begin(eh->env,parent?parent->txn:NULL,
@@ -1672,8 +1787,8 @@ VALUE env_txn_checkpoint(VALUE obj, VALUE vkbyte, VALUE vmin,
   u_int32_t kbyte=0, min=0;
 
   if ( ! NIL_P(vflags))
-    flags=NUM2INT(vflags);
-  
+    flags=NUM2UINT(vflags);
+
   if ( FIXNUM_P(vkbyte) )
     kbyte=FIX2UINT(vkbyte);
 
@@ -1681,6 +1796,8 @@ VALUE env_txn_checkpoint(VALUE obj, VALUE vkbyte, VALUE vmin,
     min=FIX2UINT(vmin);
 
   Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
   rv=eh->env->txn_checkpoint(eh->env,kbyte,min,flags);
   if ( rv != 0 ) {
     raise_error(rv, "env_txn_checkpoint: %s",db_strerror(rv));
@@ -1731,12 +1848,17 @@ VALUE db_stat(VALUE obj, VALUE vtxn, VALUE vflags)
   VALUE s_obj;
 
   if ( ! NIL_P(vflags) )
-    flags=NUM2INT(vflags);
-  if ( ! NIL_P(vtxn) )
+    flags=NUM2UINT(vflags);
+  if ( ! NIL_P(vtxn) ) {
     Data_Get_Struct(vtxn,t_txnh,txn);
+    if (!txn->txn)
+        raise(0, "txn is closed");
+  }
 
   Data_Get_Struct(obj,t_dbh,dbh);
-  
+  if (!dbh->db)
+    raise(0, "db is closed");
+
   rv=dbh->db->get_type(dbh->db,&dbtype);
   if (rv)
     raise_error(rv,"db_stat %s",db_strerror(rv));
@@ -1841,7 +1963,7 @@ VALUE db_stat(VALUE obj, VALUE vtxn, VALUE vflags)
  */
 VALUE stat_aref(VALUE obj, VALUE vname)
 {
-  rb_iv_get(obj,RSTRING(rb_str_concat(rb_str_new2("@"),vname))->ptr);
+  rb_iv_get(obj,RSTRING_PTR(rb_str_concat(rb_str_new2("@"),vname)));
 }
 
 /*
@@ -1863,9 +1985,11 @@ VALUE env_txn_stat(VALUE obj, VALUE vflags)
   int i;
 
   if ( ! NIL_P(vflags))
-    flags=NUM2INT(vflags);
+    flags=NUM2UINT(vflags);
 
   Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
 
   /* statp will need free() */
   rv=eh->env->txn_stat(eh->env,&statp,flags);
@@ -1927,10 +2051,12 @@ VALUE env_set_timeout(VALUE obj, VALUE vtimeout, VALUE vflags)
   int rv;
 
   if ( ! NIL_P(vflags))
-    flags=NUM2INT(vflags);
+    flags=NUM2UINT(vflags);
   timeout=FIX2UINT(vtimeout);
 
   Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
   rv=eh->env->set_timeout(eh->env,timeout,flags);
   if ( rv != 0 ) {
     raise_error(rv, "env_set_timeout: %s",db_strerror(rv));
@@ -1953,9 +2079,11 @@ VALUE env_get_timeout(VALUE obj, VALUE vflags)
   int rv;
 
   if ( ! NIL_P(vflags))
-    flags=NUM2INT(vflags);
-  
+    flags=NUM2UINT(vflags);
+
   Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
   rv=eh->env->get_timeout(eh->env,&timeout,flags);
   if ( rv != 0 ) {
     raise_error(rv, "env_get_timeout: %s",db_strerror(rv));
@@ -1979,6 +2107,8 @@ VALUE env_set_tx_max(VALUE obj, VALUE vmax)
   max=FIX2UINT(vmax);
 
   Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
   rv=eh->env->set_tx_max(eh->env,max);
   if ( rv != 0 ) {
     raise_error(rv, "env_set_tx_max: %s",db_strerror(rv));
@@ -2000,6 +2130,8 @@ VALUE env_get_tx_max(VALUE obj)
   int rv;
 
   Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
   rv=eh->env->get_tx_max(eh->env,&max);
   if ( rv != 0 ) {
     raise_error(rv, "env_get_tx_max: %s",db_strerror(rv));
@@ -2023,6 +2155,8 @@ VALUE env_set_shm_key(VALUE obj, VALUE vkey)
   key=FIX2UINT(vkey);
 
   Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
   rv=eh->env->set_shm_key(eh->env,key);
   if ( rv != 0 ) {
     raise_error(rv, "env_set_shm_key: %s",db_strerror(rv));
@@ -2044,12 +2178,62 @@ VALUE env_get_shm_key(VALUE obj)
   int rv;
 
   Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
   rv=eh->env->get_shm_key(eh->env,&key);
   if ( rv != 0 ) {
     raise_error(rv, "env_get_shm_key: %s",db_strerror(rv));
   }
 
   return INT2FIX(key);
+}
+
+/*
+ * call-seq:
+ * env.set_lk_detect(detect) -> detect
+ *
+ * Set when lock detector should be run
+ */
+VALUE env_set_lk_detect(VALUE obj, VALUE vdetect)
+{
+  t_envh *eh;
+  u_int32_t detect;
+  int rv;
+
+  detect=NUM2UINT(vdetect);
+
+  Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
+  rv=eh->env->set_lk_detect(eh->env,detect);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_set_lk_detect: %s",db_strerror(rv));
+  }
+
+  return vdetect;
+}
+
+/*
+ * call-seq:
+ * env.get_lk_detect() -> detect
+ *
+ * Get when lock detector should be run
+ */
+VALUE env_get_lk_detect(VALUE obj)
+{
+  t_envh *eh;
+  u_int32_t detect;
+  int rv;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
+  rv=eh->env->get_lk_detect(eh->env,&detect);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_set_lk_detect: %s",db_strerror(rv));
+  }
+
+  return UINT2NUM(detect);
 }
 
 /*
@@ -2067,6 +2251,8 @@ VALUE env_set_lk_max_locks(VALUE obj, VALUE vmax)
   max=FIX2UINT(vmax);
 
   Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
   rv=eh->env->set_lk_max_locks(eh->env,max);
   if ( rv != 0 ) {
     raise_error(rv, "env_set_lk_max_locks: %s",db_strerror(rv));
@@ -2090,6 +2276,8 @@ VALUE env_set_lk_max_objects(VALUE obj, VALUE vmax)
   max=FIX2UINT(vmax);
 
   Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
   rv=eh->env->set_lk_max_objects(eh->env,max);
   if ( rv != 0 ) {
     raise_error(rv, "env_set_lk_max_objects: %s",db_strerror(rv));
@@ -2105,20 +2293,98 @@ VALUE env_report_stderr(VALUE obj)
   int rv;
 
   Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
   eh->env->set_errfile(eh->env,stderr);
 
   return Qtrue;
 }
 
+/*
+ * call-seq:
+ * env.set_data_dir(data_dir) -> data_dir
+ *
+ * set data_dir
+ */
+VALUE env_set_data_dir(VALUE obj, VALUE vdata_dir)
+{
+  t_envh *eh;
+  const char *data_dir;
+  int rv;
+
+  data_dir=StringValueCStr(vdata_dir);
+
+  Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
+  rv=eh->env->set_data_dir(eh->env,data_dir);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_set_data_dir: %s",db_strerror(rv));
+  }
+
+  return vdata_dir;
+}
+
+/*
+ * call-seq:
+ * env.set_lg_dir(lg_dir) -> lg_dir
+ *
+ * set lg_dir
+ */
+VALUE env_set_lg_dir(VALUE obj, VALUE vlg_dir)
+{
+  t_envh *eh;
+  const char *lg_dir;
+  int rv;
+
+  lg_dir=StringValueCStr(vlg_dir);
+
+  Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
+  rv=eh->env->set_lg_dir(eh->env,lg_dir);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_set_lg_dir: %s",db_strerror(rv));
+  }
+
+  return vlg_dir;
+}
+
+/*
+ * call-seq:
+ * env.set_tmp_dir(tmp_dir) -> tmp_dir
+ *
+ * set tmp_dir
+ */
+VALUE env_set_tmp_dir(VALUE obj, VALUE vtmp_dir)
+{
+  t_envh *eh;
+  const char *tmp_dir;
+  int rv;
+
+  tmp_dir=StringValueCStr(vtmp_dir);
+
+  Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
+  rv=eh->env->set_tmp_dir(eh->env,tmp_dir);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_set_tmp_dir: %s",db_strerror(rv));
+  }
+
+  return vtmp_dir;
+}
 
 static void txn_finish(t_txnh *txn)
 {
   if ( RTEST(ruby_debug) )
     rb_warning("%s/%d %s 0x%x",__FILE__,__LINE__,"txn_finish",txn);
 
-  rb_ary_delete(txn->env->atxn,txn->self);
   txn->txn=NULL;
-  txn->env=NULL;
+  if (txn->env) {
+      rb_ary_delete(txn->env->atxn,txn->self);
+      txn->env=NULL;
+  }
 }
 
 /*
@@ -2134,9 +2400,13 @@ VALUE txn_commit(VALUE obj, VALUE vflags)
   int rv;
 
   if ( ! NIL_P(vflags))
-    flags=NUM2INT(vflags);
+    flags=NUM2UINT(vflags);
 
   Data_Get_Struct(obj,t_txnh,txn);
+
+  if (!txn->txn) 
+    return Qfalse;
+  
   rv=txn->txn->commit(txn->txn,flags);
   txn_finish(txn);
   if ( rv != 0 ) {
@@ -2158,6 +2428,10 @@ VALUE txn_abort(VALUE obj)
   int rv;
 
   Data_Get_Struct(obj,t_txnh,txn);
+
+  if (!txn->txn)
+    return Qfalse;
+
   rv=txn->txn->abort(txn->txn);
   txn_finish(txn);
   if ( rv != 0 ) {
@@ -2180,6 +2454,10 @@ VALUE txn_discard(VALUE obj)
   int rv;
 
   Data_Get_Struct(obj,t_txnh,txn);
+
+  if (!txn->txn)
+    raise_error(0,"txn is closed");
+
   rv=txn->txn->discard(txn->txn,NOFLAGS);
   txn_finish(txn);
   if ( rv != 0 ) {
@@ -2202,7 +2480,7 @@ VALUE txn_id(VALUE obj)
   int rv;
 
   Data_Get_Struct(obj,t_txnh,txn);
-  if (txn->txn==NULL)
+  if (!txn->txn)
     raise_error(0,"txn is closed");
 
   rv=txn->txn->id(txn->txn);
@@ -2223,13 +2501,17 @@ VALUE txn_set_timeout(VALUE obj, VALUE vtimeout, VALUE vflags)
   int rv;
 
   if ( ! NIL_P(vflags))
-    flags=NUM2INT(vflags);
+    flags=NUM2UINT(vflags);
 
   if ( ! FIXNUM_P(vtimeout) )
     raise_error(0,"timeout must be a fixed integer");
   timeout=FIX2UINT(vtimeout);
 
   Data_Get_Struct(obj,t_txnh,txn);
+
+  if (!txn->txn)
+    raise_error(0,"txn is closed");
+
   rv=txn->txn->set_timeout(txn->txn,timeout,flags);
   if ( rv != 0 ) {
     raise_error(rv, "txn_set_timeout: %s",db_strerror(rv));
@@ -2329,11 +2611,17 @@ void Init_bdb2() {
   rb_define_method(cEnv,"set_tx_max",env_set_tx_max,1);
   rb_define_method(cEnv,"get_tx_max",env_get_tx_max,0);
   rb_define_method(cEnv,"report_stderr",env_report_stderr,0);
+  rb_define_method(cEnv,"set_lk_detect",env_set_lk_detect,1);
+  rb_define_method(cEnv,"get_lk_detect",env_get_lk_detect,0);
   rb_define_method(cEnv,"set_lk_max_locks",env_set_lk_max_locks,1);
   rb_define_method(cEnv,"set_lk_max_objects",env_set_lk_max_objects,1);
   rb_define_method(cEnv,"set_shm_key",env_set_shm_key,1);
   rb_define_method(cEnv,"get_shm_key",env_get_shm_key,0);
-  
+
+  rb_define_method(cEnv,"set_data_dir",env_set_data_dir,1);
+  rb_define_method(cEnv,"set_lg_dir",env_set_lg_dir,1);
+  rb_define_method(cEnv,"set_tmp_dir",env_set_tmp_dir,1);
+
   cTxnStat = rb_define_class_under(mBdb,"TxnStat",rb_cObject);
   rb_define_method(cTxnStat,"[]",stat_aref,1);
 

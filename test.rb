@@ -67,6 +67,7 @@ $stderr.puts("All OK!")
 File.delete('db1.db') if File.exist?('db1.db')
 File.delete('db2.db') if File.exist?('db2.db')
 
+if File.exist?('skus') 
 db=Bdb::Db.new
 db.open(nil,"db1.db",nil,Bdb::Db::HASH,Bdb::DB_CREATE,0)
 
@@ -79,34 +80,37 @@ db.associate(nil,db2,0,
                key.split('-')[0]
              })
 
-def write_data(db)
-  c=0
-  IO.popen("gzip -dc skus.gz") {|fd|
-    tlen=fd.stat.size
-    pf=tlen/10
-    pl=0
-    fd.each do |line|
-      c+=1
-      if c%1000==0
-        $stderr.print('.') 
+c=0
+File.open("skus") {|fd|
+  tlen=fd.stat.size
+  pf=tlen/10
+  pl=0
+  fd.each do |line|
+    c+=1
+    if c%1000==0
+      $stderr.print('.') 
+      cp=fd.pos
+      if ( cp/pf > pl )
+        pl=cp/pf
+        $stderr.print(" #{pl*10}% ")
       end
-      line.chomp!
-      n=line*50 # multiply the amount of data written
-      isbn,item=line.split('|')[0..1]
-      sku="%s-%03d"%[isbn,item]
-      db.put(nil,sku,line,0)
     end
-  } if File.exist?("skus.gz")
-  $stderr.print("\ntotal count: #{c}\n")
-end
-
-write_data(db)
+    line.chomp!
+    n=line*50
+    isbn,item=line.split('|')[0..1]
+    sku="%s-%03d"%[isbn,item]
+    db.put(sku,line,0)
+  end
+}
+$stderr.print("\ntotal count: #{c}\n")
 
 db2.close(0)
 db.close(0)
+end
 
 $stderr.puts("test environment")
 
+if File.exist?('skus')
 env=Bdb::Env.new(0)
 env.cachesize=25*1024*1024;
 env.open(".",Bdb::DB_INIT_CDB|Bdb::DB_INIT_MPOOL|Bdb::DB_CREATE,0)
@@ -122,9 +126,36 @@ db.associate(nil,db2,0,
              proc {|sdb,key,data|
                key.split('-')[0]
              })
-
-write_data(db)
+c=0
+File.open("skus") {|fd|
+  tlen=fd.stat.size
+  pf=tlen/10
+  pl=0
+  fd.each do |line|
+    c+=1
+    if c%1000==0
+      $stderr.print('.') 
+      cp=fd.pos
+      if ( cp/pf > pl )
+        pl=cp/pf
+        $stderr.print(" #{pl*10}% ")
+      end
+    end
+    line.chomp!
+    n=line*50
+    isbn,item=line.split('|')[0..1]
+    sku="%s-%03d"%[isbn,item]
+    db.put(sku,line,0)
+  end
+}
+$stderr.print("\ntotal count: #{c}\n")
 
 db2.close(0)
 db.close(0)
 env.close
+end
+
+exit
+
+$stderr.puts(Rusage.get.inspect)
+$stderr.puts(`ps -up #{$$}`)
