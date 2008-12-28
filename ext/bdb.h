@@ -17,7 +17,6 @@
 #endif
 
 #include <version.h>
-#include <extconf.h>
 #include <db.h>
 
 #define NOTXN NULL
@@ -70,10 +69,10 @@ typedef struct s_txnh {
   t_envh *env;
 } t_txnh;
 
-#define cu(b,m)             \
+#define cu(b,m) \
   rb_define_const(b,#m,UINT2NUM(m))
 
-#define ci(b,m)             \
+#define ci(b,m) \
   rb_define_const(b,#m,INT2NUM(m))
 
 #define cs(b,m) \
@@ -89,13 +88,13 @@ VALUE db_ ## fname ## _eq(VALUE obj, VALUE v) \
 #define attr_writer(fname) \
   VALUE fname ## _writer(VALUE obj, VALUE v) \
   {					     \
-    rb_ivar_set(obj,fv_ ## fname,v);	     \
-    return obj;				     \
+    rb_ivar_set(obj,fv_ ## fname,v); \
+    return obj; \
   }
 
 #define attr_reader(fname) \
   VALUE fname ## _reader(VALUE obj) \
-  {				    \
+  { \
     return rb_ivar_get(obj,fv_ ## fname);  \
   }
 

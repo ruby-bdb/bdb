@@ -2528,7 +2528,7 @@ VALUE txn_set_timeout(VALUE obj, VALUE vtimeout, VALUE vflags)
  * Developed against 4.3/4.4. No support for prior versions.
  */
 
-void Init_bdb2() {
+void Init_bdb() {
   fv_call=rb_intern("call");
   fv_err_new=rb_intern("new");
   fv_err_code=rb_intern("@code");

@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-require 'bdb2'
+require 'test_helper'
 
 50.times {|n|
   db=Bdb::Db.new
