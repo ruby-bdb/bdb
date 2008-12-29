@@ -19,9 +19,6 @@ class DbTest < Test::Unit::TestCase
     result = @db.get(nil, 'key', nil, 0)
     assert_equal 'data', result
   end
-    
-  def test_pget
-  end
   
   def test_del
     @db.put(nil, 'key', 'data', 0)
@@ -31,23 +28,43 @@ class DbTest < Test::Unit::TestCase
     result = @db.get(nil, 'key', nil, 0)
     assert_nil result
   end
-    
-  def test_associate
-  end
   
   def test_flags_set_and_get
     @db1 = Bdb::Db.new
     @db1.flags = Bdb::DB_DUPSORT
     assert Bdb::DB_DUPSORT, @db1.flags
   end
-  
-  def test_aget
+    
+  def test_associate_and_pget
+    @db1 = Bdb::Db.new
+    @db1.flags = Bdb::DB_DUPSORT
+    @db1.open(nil, File.join(File.dirname(__FILE__), 'tmp', 'test1.db'), nil, Bdb::Db::HASH, Bdb::DB_CREATE, 0)
+
+    @db.associate(nil, @db1, 0, proc { |sdb, key, data| key.split('-')[0] })
+    
+    @db.put(nil, '1234-5678', 'data', 0)
+    @db.put(nil, '5678-1234', 'atad', 0)
+    
+    result = @db.get(nil, '1234-5678', nil, 0)
+    assert_equal 'data', result
+    result = @db1.get(nil, '5678', nil, 0)
+    assert_equal 'atad', result
+    
+    result = @db1.pget(nil, '1234', nil, 0)
+    assert_equal ['1234-5678', 'data'], result
+    
+    @db1.close(0)
   end
-  
-  def test_aset
-  end
-  
-  def test_join
+
+  def test_aset_and_aget
+    @db['key'] = 'data'
+    result = @db.get(nil, 'key', nil, 0)
+    assert_equal 'data', result
+    result = @db['key']
+    assert_equal 'data', result
+    @db['key'] = 'data1'
+    result = @db['key']
+    assert_equal 'data1', result
   end
   
   def test_get_byteswapped
