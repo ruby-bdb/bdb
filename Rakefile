@@ -14,11 +14,9 @@ task :default => "test"
 desc "Clean"
 task :clean do
   include FileUtils
-  rm_rf File.join('ext', 'bdb_aux._c')
-  rm_rf File.join('ext', 'Makefile')
-  rm_rf File.join('ext', 'mkmf.log')
-  rm_rf File.join('ext', 'conftest.c')
-  rm_rf File.join('ext', '*.o')
+  Dir.chdir('ext') do
+    rm(Dir.glob('*') - ['bdb.c', 'bdb.h', 'extconf.rb'])
+  end
   rm_rf 'pkg'
 end
  

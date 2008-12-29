@@ -94,9 +94,10 @@ static void db_free(t_dbh *dbh)
     fprintf(stderr,"%s/%d %s 0x%x\n",__FILE__,__LINE__,"db_free cleanup!",dbh);
 #endif
 
-  if ( dbh ) {
+  if (dbh) {
     if (dbh->db) {
-      dbh->db->close(dbh->db,NOFLAGS);
+			if (dbh->db_opened == 1)
+      	dbh->db->close(dbh->db,NOFLAGS);
       if ( RTEST(ruby_debug) && dbh->filename[0] != '\0')
     fprintf(stderr,"%s/%d %s %p %s\n",__FILE__,__LINE__,
         "db_free database was still open!",dbh->db,dbh->filename);
@@ -272,7 +273,7 @@ VALUE db_open(VALUE obj, VALUE vtxn, VALUE vdisk_file,
   }
   filename_copy(dbh->filename,vdisk_file)
   dbh->adbc=rb_ary_new();
-
+	dbh->db_opened = 1;
   return obj;
 }
 
@@ -300,6 +301,31 @@ VALUE db_flags_set(VALUE obj, VALUE vflags)
     raise_error(rv, "db_flag_set failure: %s",db_strerror(rv));
   }
   return vflags;
+}
+
+/*
+ * call-seq:
+ *	db.flags -> value
+ *
+ * get database flags.
+ * see http://www.sleepycat.com/docs/api_c/db_get_flags.html
+ *
+ */
+VALUE db_flags_get(VALUE obj)
+{
+  t_dbh *dbh;
+  int rv;
+  u_int32_t flags;
+
+  Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise_error(0,"db is closed");
+
+  rv = dbh->db->get_flags(dbh->db,&flags);
+  if ( rv != 0 ) {
+    raise_error(rv, "db_flag_get failure: %s",db_strerror(rv));
+  }
+  return INT2NUM(flags);
 }
 
 /*
@@ -493,7 +519,7 @@ VALUE db_close(VALUE obj, VALUE vflags)
   if ( rv != 0 ) {
     raise_error(rv, "db_close failure: %s",db_strerror(rv));
   }
-
+	dbh->db_opened = 0;
   return obj;
 }
 
@@ -577,9 +603,8 @@ VALUE db_get(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vdata, VALUE vflags)
   }
 
   if ( ! NIL_P(vflags) ) {
-    rb_warning("flags nil");
-    flags=NUM2UINT(vflags);
-  }
+		flags=NUM2UINT(vflags);
+	}
   
   Data_Get_Struct(obj,t_dbh,dbh);
   if (!dbh->db)
@@ -637,7 +662,6 @@ VALUE db_pget(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vdata, VALUE vflags)
   }
 
   if ( ! NIL_P(vflags) ) {
-    rb_warning("flags nil");
     flags=NUM2UINT(vflags);
   }
   
@@ -909,8 +933,9 @@ VALUE db_rename(VALUE obj, VALUE vdisk_file,
 		     StringValueCStr(newname),
 		     flags);
 
-  if (rv)
+  if (rv) {
     raise_error(rv,"db_rename failed: %s",db_strerror(rv));
+	}
   return Qtrue;
 }
 
@@ -2559,6 +2584,7 @@ void Init_bdb() {
   rb_define_method(cDb,"cursor",db_cursor,2);
   rb_define_method(cDb,"associate",db_associate,4);
   rb_define_method(cDb,"flags=",db_flags_set,1);
+	rb_define_method(cDb,"flags",db_flags_get,0);
   rb_define_method(cDb,"open",db_open,6);
   rb_define_method(cDb,"close",db_close,1);
   rb_define_method(cDb,"[]",db_aget,1);
@@ -2635,7 +2661,4 @@ void Init_bdb() {
   rb_define_method(cTxn,"discard",txn_discard,0);
   rb_define_method(cTxn,"tid",txn_id,0);
   rb_define_method(cTxn,"set_timeout",txn_set_timeout,2);
-}
-void Init_bdb2a() {
-  Init_bdb2();
 }

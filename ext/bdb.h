@@ -50,6 +50,7 @@ typedef struct s_envh {
 typedef struct s_dbh {
   VALUE self;
   DB *db;
+	int db_opened;
   VALUE aproc;
   t_envh *env; /* Parent environment, NULL if not opened from one */
   VALUE adbc; /* Ruby array holding opened cursor */
