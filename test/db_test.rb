@@ -1,17 +1,16 @@
-require 'fileutils'
 require 'test_helper'
 
 class DbTest < Test::Unit::TestCase
 
   def setup
-    FileUtils::mkdir File.join(File.dirname(__FILE__), 'tmp')
+    mkdir File.join(File.dirname(__FILE__), 'tmp')
     @db = Bdb::Db.new
     @db.open(nil, File.join(File.dirname(__FILE__), 'tmp', 'test.db'), nil, Bdb::Db::BTREE, Bdb::DB_CREATE, 0)
   end
   
   def teardown
     assert(@db.close(0)) if @db
-    FileUtils::rm_rf File.join('test', 'tmp')
+    rm_rf File.join(File.dirname(__FILE__), 'tmp')
   end
   
   def test_put_and_get
