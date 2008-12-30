@@ -1647,21 +1647,53 @@ VALUE env_set_cachesize(VALUE obj, VALUE size)
 
   if ( TYPE(size) == T_BIGNUM ) {
     ln = rb_big2ull(size);
-    bytes = (u_int32_t) ln;
-    gbytes = (u_int32_t) (ln >> sizeof(u_int32_t));
+		gbytes = ln / (1024*1024*1024);
+		bytes = ln - (gbytes*1024*1024*1024);
   } else if (FIXNUM_P(size) ) {
-    bytes=NUM2INT(size);
+    bytes=NUM2UINT(size);
   } else {
     raise_error(0,"set_cachesize requires number");
     return Qnil;
   }
 
-  rb_warning("setting cache size %d %d %d",gbytes,bytes,1);
   rv=eh->env->set_cachesize(eh->env,gbytes,bytes,1);
   if ( rv != 0 ) {
     raise_error(rv, "set_cachesize failure: %s",db_strerror(rv));
     return Qnil;
   }
+
+  return Qtrue;
+}
+
+/*
+ * call-seq:
+ * env.cachesize -> Fixnum|Bignum
+ *
+ * return the environment cache size. If it is a Bignum then it
+ * will populate the bytes and gbytes part of the DB struct.
+ * Fixnums will only populate bytes (which is still pretty big).
+ */
+VALUE env_get_cachesize(VALUE obj)
+{
+  t_envh *eh;
+  unsigned long long ln;
+  u_int32_t bytes=0,gbytes=0;
+	int ncache;
+  int rv;
+  Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
+
+  rv=eh->env->get_cachesize(eh->env,&gbytes,&bytes,&ncache);
+  if ( rv != 0 ) {
+    raise_error(rv, "get_cachesize failure: %s",db_strerror(rv));
+    return Qnil;
+  }
+
+	if (gbytes != 0)
+		return ULL2NUM(gbytes*1024*1024*1024+bytes);
+	else
+		return UINT2NUM(bytes);
 
   return Qtrue;
 }
@@ -1690,6 +1722,32 @@ VALUE env_set_flags(VALUE obj, VALUE vflags, int onoff)
 
 /*
  * call-seq:
+ * env.flags -> flags
+ *
+ * get what flags are on.
+ */
+VALUE env_get_flags(VALUE obj)
+{
+  t_envh *eh;
+  int rv;
+  u_int32_t flags;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
+
+   rv=eh->env->get_flags(eh->env,&flags);
+
+   if ( rv != 0 ) {
+     raise_error(rv, "set_flags failure: %s",db_strerror(rv));
+     return Qnil;
+   }
+
+  return UINT2NUM(flags);
+}
+
+/*
+ * call-seq:
  * env.flags_on=flags
  *
  * set the 'flags' on. An or'ed set of flags will be set on.
@@ -1701,6 +1759,7 @@ VALUE env_set_flags_on(VALUE obj, VALUE vflags)
 {
   return env_set_flags(obj,vflags,1);
 }
+
 /*
  * call-seq:
  * env.flags_off=flags
@@ -1714,6 +1773,7 @@ VALUE env_set_flags_off(VALUE obj, VALUE vflags)
 {
   return env_set_flags(obj,vflags,0);
 }
+
 /*
  * call-seq:
  * env.list_dbs -> [Bdb::Db array]
@@ -2288,6 +2348,29 @@ VALUE env_set_lk_max_locks(VALUE obj, VALUE vmax)
 
 /*
  * call-seq:
+ * env.get_lk_max_locks -> max
+ *
+ * Get the maximum number of locks in the environment
+ */
+VALUE env_get_lk_max_locks(VALUE obj)
+{
+  t_envh *eh;
+  u_int32_t max;
+  int rv;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
+  rv=eh->env->get_lk_max_locks(eh->env,&max);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_get_lk_max_locks: %s",db_strerror(rv));
+  }
+
+  return UINT2NUM(max);
+}
+
+/*
+ * call-seq:
  * env.set_lk_max_objects(max) -> max
  *
  * Set the maximum number of locks in the environment
@@ -2309,6 +2392,29 @@ VALUE env_set_lk_max_objects(VALUE obj, VALUE vmax)
   }
 
   return vmax;
+}
+
+/*
+ * call-seq:
+ * env.get_lk_max_objects -> max
+ *
+ * Get the maximum number of locks in the environment
+ */
+VALUE env_get_lk_max_objects(VALUE obj)
+{
+  t_envh *eh;
+  u_int32_t max;
+  int rv;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
+  rv=eh->env->get_lk_max_objects(eh->env,&max);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_get_lk_max_objects: %s",db_strerror(rv));
+  }
+
+  return UINT2NUM(max);
 }
 
 VALUE env_report_stderr(VALUE obj)
@@ -2352,6 +2458,37 @@ VALUE env_set_data_dir(VALUE obj, VALUE vdata_dir)
 
 /*
  * call-seq:
+ * env.get_data_dir -> [data_dir_1, data_dir_2, ...]
+ *
+ * get data_dir
+ */
+VALUE env_get_data_dirs(VALUE obj)
+{
+  t_envh *eh;
+  const char **data_dirs;
+  int rv;
+	int ln;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
+  rv=eh->env->get_data_dirs(eh->env,&data_dirs);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_get_data_dir: %s",db_strerror(rv));
+  }
+
+	ln = (sizeof (data_dirs))/sizeof(data_dirs[0]);
+	VALUE rb_data_dirs = rb_ary_new2(ln);
+	int i;
+	for (i=0; i<ln; i++) {
+		rb_ary_push(rb_data_dirs, rb_str_new2(data_dirs[i]));
+	}
+	
+  return rb_data_dirs;
+}
+
+/*
+ * call-seq:
  * env.set_lg_dir(lg_dir) -> lg_dir
  *
  * set lg_dir
@@ -2377,6 +2514,29 @@ VALUE env_set_lg_dir(VALUE obj, VALUE vlg_dir)
 
 /*
  * call-seq:
+ * env.get_lg_dir -> lg_dir
+ *
+ * get lg_dir
+ */
+VALUE env_get_lg_dir(VALUE obj)
+{
+  t_envh *eh;
+  const char *lg_dir;
+  int rv;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
+  rv=eh->env->get_lg_dir(eh->env,&lg_dir);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_get_lg_dir: %s",db_strerror(rv));
+  }
+
+  return rb_str_new2(lg_dir);
+}
+
+/*
+ * call-seq:
  * env.set_tmp_dir(tmp_dir) -> tmp_dir
  *
  * set tmp_dir
@@ -2398,6 +2558,29 @@ VALUE env_set_tmp_dir(VALUE obj, VALUE vtmp_dir)
   }
 
   return vtmp_dir;
+}
+
+/*
+ * call-seq:
+ * env.get_tmp_dir -> tmp_dir
+ *
+ * get tmp_dir
+ */
+VALUE env_get_tmp_dir(VALUE obj)
+{
+  t_envh *eh;
+  const char *tmp_dir;
+  int rv;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
+  rv=eh->env->get_tmp_dir(eh->env,&tmp_dir);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_get_tmp_dir: %s",db_strerror(rv));
+  }
+
+  return rb_str_new2(tmp_dir);
 }
 
 static void txn_finish(t_txnh *txn)
@@ -2626,6 +2809,8 @@ void Init_bdb() {
   rb_define_method(cEnv,"close",env_close,0);
   rb_define_method(cEnv,"db",env_db,0);
   rb_define_method(cEnv,"cachesize=",env_set_cachesize,1);
+ 	rb_define_method(cEnv,"cachesize",env_get_cachesize,0);
+	rb_define_method(cEnv,"flags",env_get_flags,0);
   rb_define_method(cEnv,"flags_on=",env_set_flags_on,1);
   rb_define_method(cEnv,"flags_off=",env_set_flags_off,1);
   rb_define_method(cEnv,"list_dbs",env_list_dbs,0);
@@ -2640,13 +2825,18 @@ void Init_bdb() {
   rb_define_method(cEnv,"set_lk_detect",env_set_lk_detect,1);
   rb_define_method(cEnv,"get_lk_detect",env_get_lk_detect,0);
   rb_define_method(cEnv,"set_lk_max_locks",env_set_lk_max_locks,1);
+	rb_define_method(cEnv,"get_lk_max_locks",env_get_lk_max_locks,0);
   rb_define_method(cEnv,"set_lk_max_objects",env_set_lk_max_objects,1);
+	rb_define_method(cEnv,"get_lk_max_objects",env_get_lk_max_objects,0);
   rb_define_method(cEnv,"set_shm_key",env_set_shm_key,1);
   rb_define_method(cEnv,"get_shm_key",env_get_shm_key,0);
 
   rb_define_method(cEnv,"set_data_dir",env_set_data_dir,1);
+	rb_define_method(cEnv,"get_data_dirs",env_get_data_dirs,0);
   rb_define_method(cEnv,"set_lg_dir",env_set_lg_dir,1);
+	rb_define_method(cEnv,"get_lg_dir",env_get_lg_dir,0);
   rb_define_method(cEnv,"set_tmp_dir",env_set_tmp_dir,1);
+	rb_define_method(cEnv,"get_tmp_dir",env_get_tmp_dir,0);
 
   cTxnStat = rb_define_class_under(mBdb,"TxnStat",rb_cObject);
   rb_define_method(cTxnStat,"[]",stat_aref,1);
