@@ -1453,7 +1453,7 @@ VALUE dbc_count(VALUE obj)
   rv = dbch->dbc->c_count(dbch->dbc,&count,NOFLAGS);
   if (rv != 0)
     raise_error(rv, "db_count failure: %s",db_strerror(rv));
-  
+
   return INT2FIX(count);
 }
 

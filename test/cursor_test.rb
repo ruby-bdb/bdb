@@ -63,4 +63,41 @@ class CursorTest < Test::Unit::TestCase
     assert_equal 1, @cursor.count
   end  
 
+  def test_join
+    @personnel_db = Bdb::Db.new
+    @personnel_db.open(nil, File.join(File.dirname(__FILE__), 'tmp', 'personnel_db.db'), nil, Bdb::Db::HASH, Bdb::DB_CREATE, 0)
+
+    @names_db = Bdb::Db.new
+    @names_db.flags = Bdb::DB_DUPSORT
+    @names_db.open(nil, File.join(File.dirname(__FILE__), 'tmp', 'names_db.db'), nil, Bdb::Db::HASH, Bdb::DB_CREATE, 0)
+
+    @jobs_db = Bdb::Db.new
+    @jobs_db.flags = Bdb::DB_DUPSORT
+    @jobs_db.open(nil, File.join(File.dirname(__FILE__), 'tmp', 'jobs_db.db'), nil, Bdb::Db::HASH, Bdb::DB_CREATE, 0)
+    
+    [{:ssn => '111-11-1111', :lastname => 'Smith',  :job => 'welder'},
+     {:ssn => '222-22-2222', :lastname => 'Jones', :job => 'welder'},
+     {:ssn => '333-33-3333', :lastname => 'Smith', :job => 'painter'}].each do |e|
+      @personnel_db.put(nil, e[:ssn], Marshal.dump([e[:ssn], e[:lastname], e[:job]]), 0)
+      @names_db.put(nil, e[:lastname], e[:ssn], 0)
+      @jobs_db.put(nil, e[:job], e[:ssn], 0)
+    end
+    
+    @name_cursor = @names_db.cursor(nil, 0)
+    @name_cursor.get('Smith', nil, Bdb::DB_SET)
+    assert_equal 2, @name_cursor.count
+    @job_cursor = @jobs_db.cursor(nil, 0)
+    @job_cursor.get('welder', nil, Bdb::DB_SET)
+    assert_equal 2, @job_cursor.count
+    @personnel_cursor = @personnel_db.join([@name_cursor, @job_cursor], 0)
+    assert_equal '111-11-1111', @personnel_cursor.get(nil, nil, 0).first
+
+    @personnel_cursor.close
+    @name_cursor.close
+    @job_cursor.close
+    
+    @jobs_db.close(0)
+    @names_db.close(0)
+    @personnel_db.close(0)
+  end
 end
