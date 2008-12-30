@@ -512,7 +512,8 @@ VALUE db_close(VALUE obj, VALUE vflags)
   dbh->db=NULL;
   dbh->aproc=Qnil;
   if ( dbh->env ) {
-    rb_warning("%s/%d %s 0x%x",__FILE__,__LINE__,"db_close! removing",obj);
+  	if ( RTEST(ruby_debug) )
+    	rb_warning("%s/%d %s 0x%x",__FILE__,__LINE__,"db_close! removing",obj);
     rb_ary_delete(dbh->env->adb,obj);
     dbh->env = NULL;
   }

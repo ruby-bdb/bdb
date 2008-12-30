@@ -30,6 +30,7 @@ class EnvTest < Test::Unit::TestCase
     
     db = env.db
     assert_equal db, env.list_dbs.first
+    db.close(0)
   end
     
   def test_set_and_get_timeout
