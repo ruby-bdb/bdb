@@ -1,6 +1,6 @@
 h1. Bdb
 
-Ruby bindings for Berkeley DB versions 4.2-4.6.
+Ruby bindings for Berkeley DB versions 4.2-4.7.
 
 h2. Download
 
