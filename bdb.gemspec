@@ -24,6 +24,5 @@ BDB_SPEC = Gem::Specification.new do |s|
     s.homepage = "http://github.com/mattbauer/bdb"
  
     s.require_paths = ["lib", "ext"]
-    s.test_files    = Dir.glob('test/*.rb')
     s.has_rdoc      = false
 end
