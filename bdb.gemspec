@@ -6,12 +6,26 @@ BDB_SPEC = Gem::Specification.new do |s|
     s.authors   =  ["Matt Bauer", "Dan Janowski"]
     s.email     =  "bauer@pedalbrain.com"
     s.summary   =   "A Ruby interface to BerkeleyDB"
-    s.files     =   FileList['lib/**/*', 'ext/**/*', 'test/**/*', 'LICENSE', 'README.textile', 'Rakefile'].to_a
+    s.files     =   ['bdb.gemspec',
+                     'ext/bdb.c',
+                     'ext/bdb.h',
+                     'ext/extconf.rb',
+                     'LICENSE',
+                     'README.textile',
+                     'Rakefile']
+    s.test_files =  ['test/cursor_test.rb',
+                     'test/db_test.rb',
+                     'test/env_test.rb',
+                     'test/stat_test.rb',
+                     'test/test_helper.rb',
+                     'test/txn_test.rb']
     s.extensions = ["ext/extconf.rb"]
  
     s.homepage = "http://github.com/mattbauer/bdb"
  
-    s.require_paths  = ["lib", "ext"]
-    s.test_files = Dir.glob('test/*.rb')
-    s.has_rdoc  =   true
+    s.require_paths = ["lib", "ext"]
+    s.test_files    = Dir.glob('test/*.rb')
+    s.has_rdoc      = true
+    s.rdoc_options  = ["--main", "README.textile"]
+    s.extra_rdoc_files = ["README.textile"]
 end
