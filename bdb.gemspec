@@ -25,7 +25,5 @@ BDB_SPEC = Gem::Specification.new do |s|
  
     s.require_paths = ["lib", "ext"]
     s.test_files    = Dir.glob('test/*.rb')
-    s.has_rdoc      = true
-    s.rdoc_options  = ["--main", "README.textile"]
-    s.extra_rdoc_files = ["README.textile"]
+    s.has_rdoc      = false
 end
