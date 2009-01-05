@@ -86,5 +86,16 @@ class EnvTest < Test::Unit::TestCase
     env.set_tmp_dir('/tmp')
     assert_equal '/tmp', env.get_tmp_dir    
   end
+
+  def test_get_home
+    env = Bdb::Env.new(0)
+    tmp_dir = File.expand_path(File.join(File.dirname(__FILE__), 'tmp'))
+    mkdir_p tmp_dir
+    env.open(tmp_dir, Bdb::DB_CREATE, 0);
+    assert_equal tmp_dir, env.get_home
+    env.close
+  ensure
+    rm_rf tmp_dir
+  end
   
 end

@@ -2584,6 +2584,29 @@ VALUE env_get_tmp_dir(VALUE obj)
   return rb_str_new2(tmp_dir);
 }
 
+/*
+ * call-seq:
+ * env.get_home -> home
+ *
+ * get home
+ */
+VALUE env_get_home(VALUE obj)
+{
+  t_envh *eh;
+  const char *home;
+  int rv;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
+  rv=eh->env->get_home(eh->env,&home);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_get_home: %s",db_strerror(rv));
+  }
+
+  return rb_str_new2(home);
+}
+
 static void txn_finish(t_txnh *txn)
 {
   if ( RTEST(ruby_debug) )
@@ -2838,6 +2861,7 @@ void Init_bdb() {
 	rb_define_method(cEnv,"get_lg_dir",env_get_lg_dir,0);
   rb_define_method(cEnv,"set_tmp_dir",env_set_tmp_dir,1);
 	rb_define_method(cEnv,"get_tmp_dir",env_get_tmp_dir,0);
+	rb_define_method(cEnv,"get_home",env_get_home,0);
 
   cTxnStat = rb_define_class_under(mBdb,"TxnStat",rb_cObject);
   rb_define_method(cTxnStat,"[]",stat_aref,1);
