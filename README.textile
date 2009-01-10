@@ -23,10 +23,16 @@ You can check out the latest source from git:
 h3. As a Gem
 
 At the moment this library is not available on Rubyforge.  To install it as a
-gem, do the following:
+gem, do the following (for custom compiled version 4.7):
 
 <pre>
    sudo env ARCHFLAGS="-arch i386" gem install mattbauer-bdb --source http://gems.github.com -- --with-db-dir=/usr/local/BerkeleyDB.4.7
+</pre>
+
+For Berkeley DB v4.6 installed from MacPorts do the following:
+
+<pre>
+   sudo env ARCHFLAGS="-arch i386" gem install mattbauer-bdb --source http://gems.github.com -- --with-db-include=/opt/local/include/db46 --with-db-lib=/opt/local/lib/db46
 </pre>
 
 This assumes you're on OS X and BerkeleyDB wasn't compiled as a universal binary.
