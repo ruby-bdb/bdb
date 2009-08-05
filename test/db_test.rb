@@ -55,6 +55,30 @@ class DbTest < Test::Unit::TestCase
     @db1.close(0)
   end
 
+  def test_associate_with_multiple_keys
+    @db1 = Bdb::Db.new
+    @db1.flags = Bdb::DB_DUPSORT
+    @db1.open(nil, File.join(File.dirname(__FILE__), 'tmp', 'test1.db'), nil, Bdb::Db::HASH, Bdb::DB_CREATE, 0)
+
+    @db.associate(nil, @db1, 0, proc { |sdb, key, data| key.split('-') })
+    
+    @db.put(nil, '1234-5678', 'data', 0)
+    @db.put(nil, '8765-4321', 'atad', 0)
+    
+    result = @db.get(nil, '1234-5678', nil, 0)
+    assert_equal 'data', result
+    result = @db1.get(nil, '5678', nil, 0)
+    assert_equal 'data', result
+    result = @db1.get(nil, '1234', nil, 0)
+    assert_equal 'data', result
+    result = @db1.get(nil, '8765', nil, 0)
+    assert_equal 'atad', result
+    result = @db1.get(nil, '4321', nil, 0)
+    assert_equal 'atad', result
+    
+    @db1.close(0)
+  end
+
   def test_aset_and_aget
     @db['key'] = 'data'
     result = @db.get(nil, 'key', nil, 0)

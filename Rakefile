@@ -22,7 +22,7 @@ end
  
 desc "Run tests"
 Rake::TestTask.new("test") do |t|
-  t.libs << ["test", "ext"]
+  t.libs.concat ["test", "ext"]
   t.pattern = 'test/*_test.rb'
   t.verbose = true
   t.warning = true

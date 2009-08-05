@@ -63,6 +63,42 @@ class CursorTest < Test::Unit::TestCase
     assert_equal 1, @cursor.count
   end  
 
+  def test_get_all_in_order
+    all = []
+    while pair = @cursor.get(nil, nil, Bdb::DB_NEXT)      
+      all << pair.first
+    end
+    assert_equal (0..9).collect {|i| i.to_s}, all
+  end
+
+  def test_get_all_with_set_btree_compare
+    @db1 = Bdb::Db.new
+    @db1.set_btree_compare(proc {|db, key1, key2| key2 <=> key1})
+    @db1.open(nil, File.join(File.dirname(__FILE__), 'tmp', 'test1.db'), nil, Bdb::Db::BTREE, Bdb::DB_CREATE, 0)    
+    10.times { |i| @db1.put(nil, i.to_s, "data-#{i}", 0)}
+    @cursor1 = @db1.cursor(nil, 0)
+
+    all = []
+    while pair = @cursor1.get(nil, nil, Bdb::DB_NEXT)      
+      all << pair.first
+    end
+    assert_equal (0..9).collect {|i| i.to_s}.reverse, all
+    @cursor1.close
+    @db1.close(0)
+  end
+
+  def test_btree_compare_raises_if_fixnum_not_returned
+    @db1 = Bdb::Db.new
+    @db1.set_btree_compare(proc {|db, key1, key2| key1})
+    @db1.open(nil, File.join(File.dirname(__FILE__), 'tmp', 'test1.db'), nil, Bdb::Db::BTREE, Bdb::DB_CREATE, 0)    
+
+    assert_raises(TypeError) do
+      @db1.put(nil, "no", "way", 0)
+      @db1.put(nil, "ho", "say", 0)
+    end
+    @db1.close(Bdb::DB_NOSYNC)
+  end
+
   def test_join
     @personnel_db = Bdb::Db.new
     @personnel_db.open(nil, File.join(File.dirname(__FILE__), 'tmp', 'personnel_db.db'), nil, Bdb::Db::HASH, Bdb::DB_CREATE, 0)

@@ -52,6 +52,8 @@ typedef struct s_dbh {
   DB *db;
 	int db_opened;
   VALUE aproc;
+  VALUE sproc; /* key sorting callback */
+  
   t_envh *env; /* Parent environment, NULL if not opened from one */
   VALUE adbc; /* Ruby array holding opened cursor */
   char filename[FNLEN+1];

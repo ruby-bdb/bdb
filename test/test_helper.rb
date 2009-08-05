@@ -1,6 +1,6 @@
-require "test/unit"
+require 'test/unit'
 require 'fileutils'
-require "bdb"
+require File.dirname(__FILE__) + '/../ext/bdb'
 
 class Test::Unit::TestCase
   include FileUtils

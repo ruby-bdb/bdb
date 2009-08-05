@@ -30,7 +30,7 @@ VALUE cTxnStat; /* Transaction Status class */
 VALUE cTxnStatActive; /* Active Transaction Status class */
 VALUE eDbError;
 
-static ID fv_call, fv_err_new,fv_err_code,fv_err_msg;
+static ID fv_call,fv_uniq,fv_err_new,fv_err_code,fv_err_msg;
 
 /*
  * Document-class: Bdb::DbError
@@ -178,6 +178,7 @@ VALUE db_init_aux(VALUE obj,t_envh * eh)
   dbh->self=obj;
   dbh->env=eh;
   dbh->aproc=Qnil;
+  dbh->sproc=Qnil;
   memset(&(dbh->filename),0,FNLEN+1);
 
   dbh->adbc=Qnil;
@@ -264,6 +265,7 @@ VALUE db_open(VALUE obj, VALUE vtxn, VALUE vdisk_file,
   if ( ! NIL_P(dbh->adbc) )
     raise_error(0,"db handle already opened");
   
+  dbh->db->app_private=dbh;
   rv = dbh->db->open(dbh->db,txn?txn->txn:NULL,
 		     StringValueCStr(vdisk_file),
 		     logical_db,
@@ -511,6 +513,7 @@ VALUE db_close(VALUE obj, VALUE vflags)
   rv = dbh->db->close(dbh->db,flags);
   dbh->db=NULL;
   dbh->aproc=Qnil;
+  dbh->sproc=Qnil;
   if ( dbh->env ) {
   	if ( RTEST(ruby_debug) )
     	rb_warning("%s/%d %s 0x%x",__FILE__,__LINE__,"db_close! removing",obj);
@@ -1087,29 +1090,45 @@ VALUE db_del(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vflags)
   return Qtrue;
 }
 
-t_dbh *dbassoc[LMAXFD];
+void assoc_key(DBT* result, VALUE obj) {
+  VALUE str=StringValue(obj);
+
+#ifdef DEBUG_DB
+  fprintf(stderr,"assoc_key %*s", RSTRING_LEN(str),RSTRING_PTR(str));
+#endif
+
+  result->data=RSTRING_PTR(str);
+  result->size=RSTRING_LEN(str);
+  result->flags=LMEMFLAG;
+}
+
 VALUE
 assoc_callback2(VALUE *args)
 {
   return rb_funcall(args[0],fv_call,3,args[1],args[2],args[3]);
 }
 
-int assoc_callback(DB *secdb,const DBT* key, const DBT* data, DBT* result)
+int assoc_callback(DB *secdb, const DBT* key, const DBT* data, DBT* result)
 {
   t_dbh *dbh;
   VALUE proc;
-  int fdp,status;
+  int status;
   VALUE retv;
   VALUE args[4];
+  VALUE keys;
+  int i;
 
   memset(result,0,sizeof(DBT));
-  secdb->fd(secdb,&fdp);
-  dbh=dbassoc[fdp];
+  dbh=secdb->app_private;
 
   args[0]=dbh->aproc;
   args[1]=dbh->self;
   args[2]=rb_str_new(key->data,key->size);
   args[3]=rb_str_new(data->data,data->size);
+
+#ifdef DEBUG_DB
+  fprintf(stderr,"assoc_data %*s", data->size, data->data);
+#endif
 
   retv=rb_protect((VALUE(*)_((VALUE)))assoc_callback2,(VALUE)args,&status);
 
@@ -1117,18 +1136,29 @@ int assoc_callback(DB *secdb,const DBT* key, const DBT* data, DBT* result)
   if ( NIL_P(retv) )
     return DB_DONOTINDEX;
 
-  if ( TYPE(retv) != T_STRING )
-    rb_warning("return from assoc callback not a string!");
+  keys = rb_check_array_type(retv);
+  if (!NIL_P(keys)) {
+      keys = rb_funcall(keys,fv_uniq,0); /* secondary keys must be uniq */
+    switch(RARRAY(keys)->len) {
+    case 0:
+      return DB_DONOTINDEX;
+    case 1:
+      retv=RARRAY(keys)->ptr[0];
+      break;
+    default:
+      result->size=RARRAY(keys)->len;
+      result->flags=DB_DBT_MULTIPLE | DB_DBT_APPMALLOC;
+      result->data=malloc(result->size * sizeof(DBT));
+      memset(result->data,0,result->size * sizeof(DBT));
+    
+      for (i=0; i<result->size; i++) {
+          assoc_key(result->data + i*sizeof(DBT), (VALUE)RARRAY(keys)->ptr[i]);
+      }
+      return 0;
+    }
+  }
 
-  StringValue(retv);
-#ifdef DEBUG_DB
-  fprintf(stderr,"assoc_key %*s for %*s\n",
-      RSTRING_LEN(retv),RSTRING_PTR(retv),
-      data->size,data->data);
-#endif
-  result->data=RSTRING_PTR(retv);
-  result->size=RSTRING_LEN(retv);
-  result->flags=LMEMFLAG;
+  assoc_key(result, retv);
   return 0;
 }
 
@@ -1138,14 +1168,7 @@ int assoc_callback(DB *secdb,const DBT* key, const DBT* data, DBT* result)
  *
  * associate a secondary index(database) with this (primary)
  * database. The proc can be nil if the database is only opened
- * DB_RDONLY. Only +one+ proc can be assigned to a given database
- * according to the file-descriptor number of the secondary within
- * a single ruby process. This is typcially not an issue since
- * the proc should always be the same (it would corrupt the
- * secondary otherwise). But this does limit use of nil if the
- * db is openend DB_RDONLY and writeable in the same process.
- * (although, opening the same db more than once has not been
- * tested)
+ * DB_RDONLY.
  *
  * call back proc has signature:
  * proc(secdb,key,value)
@@ -1190,20 +1213,80 @@ VALUE db_associate(VALUE obj, VALUE vtxn, VALUE osecdb,
     raise_error(0, "db_associate proc required");
   }
   
-  sdbh->db->fd(sdbh->db,&fdp);
   sdbh->aproc=cb_proc;
 
-  /* No register is needed since this is just a way to
-   * get back to a real object
-   */
-  dbassoc[fdp]=sdbh;
   rv=pdbh->db->associate(pdbh->db,txn?txn->txn:NULL,sdbh->db,assoc_callback,flags);
 #ifdef DEBUG_DB
   fprintf(stderr,"file is %d\n",fdp);
-  fprintf(stderr,"assoc done 0x%x 0x%x\n",sdbh,dbassoc[fdp]);
+  fprintf(stderr,"assoc done 0x%x\n",sdbh);
 #endif
   if (rv != 0) {
     raise_error(rv, "db_associate failure: %s",db_strerror(rv));
+  }
+  return Qtrue;
+}
+
+VALUE
+bt_compare_callback2(VALUE *args)
+{
+  return rb_funcall(args[0],fv_call,3,args[1],args[2],args[3]);
+}
+
+int bt_compare_callback(DB *db, const DBT* key1, const DBT* key2)
+{
+  t_dbh *dbh;
+  VALUE proc;
+  int cmp;
+  VALUE retv;
+
+  dbh=db->app_private;
+
+  /* Shouldn't catch exceptions in the callback, because bad sort data will corrupt the BTree.*/
+  retv=rb_funcall(dbh->sproc,fv_call,3,dbh->self,
+                  rb_str_new(key1->data,key1->size),rb_str_new(key2->data,key2->size));
+
+  if (!FIXNUM_P(retv))
+    rb_raise(rb_eTypeError,"btree comparison should return Fixnum");
+
+  cmp=FIX2INT(retv);
+
+#ifdef DEBUG_DB
+  fprintf(stderr,"bt_compare %*s <=> %*s: %d", key1->size, key1->data, key2->size, key2->data, cmp);
+#endif
+
+  return cmp;
+}
+
+/*
+ * call-seq:
+ * db.set_bt_compare(proc)
+ *
+ * set the btree key comparison function to the callback proc.
+ *
+ * callback proc has signature:
+ * proc(db,key1,key2)
+ */
+VALUE db_set_bt_compare(VALUE obj, VALUE cb_proc)
+{
+  t_dbh *dbh;
+  int rv;
+
+  Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise(0, "db is closed");
+
+  if ( rb_obj_is_instance_of(cb_proc,rb_cProc) != Qtrue ) {
+    raise_error(0, "db_associate proc required");
+  }
+  
+  dbh->sproc=cb_proc;
+  rv=dbh->db->set_bt_compare(dbh->db,bt_compare_callback);
+
+#ifdef DEBUG_DB
+  fprintf(stderr,"set_bt_compare done 0x%x\n",dbh);
+#endif
+  if (rv != 0) {
+    raise_error(rv, "db_set_bt_compare failure: %s",db_strerror(rv));
   }
   return Qtrue;
 }
@@ -2762,6 +2845,7 @@ VALUE txn_set_timeout(VALUE obj, VALUE vtimeout, VALUE vflags)
 
 void Init_bdb() {
   fv_call=rb_intern("call");
+  fv_uniq=rb_intern("uniq");
   fv_err_new=rb_intern("new");
   fv_err_code=rb_intern("@code");
   fv_err_msg=rb_intern("@message");
@@ -2790,6 +2874,7 @@ void Init_bdb() {
   rb_define_method(cDb,"del",db_del,3);
   rb_define_method(cDb,"cursor",db_cursor,2);
   rb_define_method(cDb,"associate",db_associate,4);
+  rb_define_method(cDb,"set_btree_compare",db_set_bt_compare,1);
   rb_define_method(cDb,"flags=",db_flags_set,1);
 	rb_define_method(cDb,"flags",db_flags_get,0);
   rb_define_method(cDb,"open",db_open,6);
