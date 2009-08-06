@@ -21,6 +21,17 @@ class CursorTest < Test::Unit::TestCase
     assert_equal '0', key
     assert_equal 'data-0', value
   end
+
+  def test_get_range
+    keys = []
+    key, value = @cursor.get("4", nil, Bdb::DB_SET_RANGE)
+    while key and key <= "9"
+      keys << key
+      key, value = @cursor.get(nil, nil, Bdb::DB_NEXT)
+    end
+
+    assert_equal (4..9).collect {|i| i.to_s}, keys
+  end
   
   def test_pget
     @db1 = Bdb::Db.new
@@ -71,9 +82,9 @@ class CursorTest < Test::Unit::TestCase
     assert_equal (0..9).collect {|i| i.to_s}, all
   end
 
-  def test_get_all_with_set_btree_compare
+  def test_get_all_with_btree_compare
     @db1 = Bdb::Db.new
-    @db1.set_btree_compare(proc {|db, key1, key2| key2 <=> key1})
+    @db1.btree_compare = proc {|db, key1, key2| key2 <=> key1}
     @db1.open(nil, File.join(File.dirname(__FILE__), 'tmp', 'test1.db'), nil, Bdb::Db::BTREE, Bdb::DB_CREATE, 0)    
     10.times { |i| @db1.put(nil, i.to_s, "data-#{i}", 0)}
     @cursor1 = @db1.cursor(nil, 0)
@@ -89,7 +100,7 @@ class CursorTest < Test::Unit::TestCase
 
   def test_btree_compare_raises_if_fixnum_not_returned
     @db1 = Bdb::Db.new
-    @db1.set_btree_compare(proc {|db, key1, key2| key1})
+    @db1.btree_compare = proc {|db, key1, key2| key1}
     @db1.open(nil, File.join(File.dirname(__FILE__), 'tmp', 'test1.db'), nil, Bdb::Db::BTREE, Bdb::DB_CREATE, 0)    
 
     assert_raises(TypeError) do

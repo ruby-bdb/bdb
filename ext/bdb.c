@@ -1259,14 +1259,14 @@ int bt_compare_callback(DB *db, const DBT* key1, const DBT* key2)
 
 /*
  * call-seq:
- * db.set_bt_compare(proc)
+ * db.btree_compare = proc
  *
  * set the btree key comparison function to the callback proc.
  *
  * callback proc has signature:
  * proc(db,key1,key2)
  */
-VALUE db_set_bt_compare(VALUE obj, VALUE cb_proc)
+VALUE db_btree_compare_set(VALUE obj, VALUE cb_proc)
 {
   t_dbh *dbh;
   int rv;
@@ -1283,10 +1283,10 @@ VALUE db_set_bt_compare(VALUE obj, VALUE cb_proc)
   rv=dbh->db->set_bt_compare(dbh->db,bt_compare_callback);
 
 #ifdef DEBUG_DB
-  fprintf(stderr,"set_bt_compare done 0x%x\n",dbh);
+  fprintf(stderr,"btree_compare set 0x%x\n",dbh);
 #endif
   if (rv != 0) {
-    raise_error(rv, "db_set_bt_compare failure: %s",db_strerror(rv));
+    raise_error(rv, "db_btree_compare_set failure: %s",db_strerror(rv));
   }
   return Qtrue;
 }
@@ -2874,7 +2874,7 @@ void Init_bdb() {
   rb_define_method(cDb,"del",db_del,3);
   rb_define_method(cDb,"cursor",db_cursor,2);
   rb_define_method(cDb,"associate",db_associate,4);
-  rb_define_method(cDb,"set_btree_compare",db_set_bt_compare,1);
+  rb_define_method(cDb,"btree_compare=",db_btree_compare_set,1);
   rb_define_method(cDb,"flags=",db_flags_set,1);
 	rb_define_method(cDb,"flags",db_flags_get,0);
   rb_define_method(cDb,"open",db_open,6);
