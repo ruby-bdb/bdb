@@ -19,7 +19,7 @@ class Bdb::Simple
       @db = Bdb::Db.new
       @db.flags = Bdb::DB_DUPSORT if dup?
       @db.btree_compare = lambda do |db, key1, key2|
-        Marshal.load(key1) <=> Marshal.load(key2)
+        compare_absolute(Marshal.load(key1), Marshal.load(key2))
       end
       @db.open(nil, file, nil, Bdb::Db::BTREE, Bdb::DB_CREATE, 0)    
     end
@@ -83,5 +83,23 @@ class Bdb::Simple
   def close
     db.close(0)
     @db = nil
+  end
+
+  def self.compare_absolute(left, right)
+    if left.is_a?(Array) and right.is_a?(Array)
+      left.zip(right) do |l,r|
+        comp = compare_absolute(l, r)
+        return comp unless comp == 0
+      end
+      left.size == right.size ? 0 : -1
+    elsif left.kind_of?(right.class) or right.kind_of?(left.class)
+      left <=> right rescue 0
+    elsif left.is_a?(NilClass)
+      -1
+    elsif right.is_a?(NilClass)
+      1
+    else
+      right.class.name <=> left.class.name
+    end
   end
 end
