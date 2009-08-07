@@ -44,7 +44,7 @@ class SimpleTest < Test::Unit::TestCase
   def test_compare_absolute
     list = [5, 6, "foo", :bar, "bar", :foo, [1,2,4], true, [1,2,3], false, [1], [2], nil, {}, {:b => 1, :a => 1}, {:b => 2, :a => 1}]
 
-    expected = [nil, true, :bar, :foo, "bar", "foo", 5, 6, false, [1], [1, 2, 3], [1, 2, 4], [2], {}, {:a=>1, :b=>1}, {:a=>1, :b=>2}]
+    expected = [nil, false, true, 5, 6, :bar, :foo, "bar", "foo", [1], [1, 2, 3], [1, 2, 4], [2], {}, {:a=>1, :b=>1}, {:a=>1, :b=>2}]
     assert_equal expected, list.sort {|a,b| Bdb::Simple.compare_absolute(a,b)}
     100.times do
       assert_equal expected, list.shuffle.sort {|a,b| Bdb::Simple.compare_absolute(a,b)}

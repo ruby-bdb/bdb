@@ -68,37 +68,49 @@ class Bdb::Simple
     @db = nil
   end
 
+  CLASS_ORDER = {}
+  [FalseClass, TrueClass, Fixnum, Numeric, Float, Symbol, String, Array].each_with_index {|c, i| CLASS_ORDER[c] = i}
+
   def self.compare_absolute(left, right)
-    if left.class == right.class
-      if left.is_a?(Array) and right.is_a?(Array)
+    if left.is_a?(right.class)
+      case left
+      when Array
         # Arrays: compare one element at a time.
-        left.zip(right) do |l,r|
-          comp = compare_absolute(l, r)
-          return comp unless comp == 0
+        n = [left.size, right.size].min
+        n.times do |i|
+          comp = compare_absolute(left[i], right[i])
+          return comp if comp != 0
         end
-        left.size == right.size ? 0 : -1
-      elsif left.is_a?(Hash) and right.is_a?(Hash)
-        # Hashes: sort the keys and compare as an array of arrays.
+        left.size <=> right.size
+      when Hash
+        # Hashes: sort the keys and compare as an array of arrays. This may be slow.
         left  = left.to_a.sort  {|a,b| compare_absolute(a[0],b[0])}
         right = right.to_a.sort {|a,b| compare_absolute(a[0],b[0])}
         compare_absolute(left, right)
+      when NilClass, TrueClass, FalseClass
+        0
+      when Symbol
+        left.to_s <=> right.to_s
       else
-        begin
-          # Try to use the spaceship operator.
-          left <=> right
-        rescue NoMethodError => e
-          left.hash <=> right.hash
-        end
-      end
+        # Use the spaceship operator.
+        left <=> right
+      end    
+    elsif left.kind_of?(Numeric) and right.kind_of?(Numeric)
+      # Numerics are always comparable.
+      left <=> right
     else
-      # Nil is the smallest. Hash is the largest. All other objects are sorted by class name.
-      return -1 if left.is_a?(NilClass)
-      return  1 if right.is_a?(NilClass)
-      return  1 if left.is_a?(Hash)
-      return -1 if right.is_a?(Hash)
+      # Nil is the smallest. Hash is the largest.
+      return -1 if left.is_a?(NilClass) or right.is_a?(Hash)
+      return  1 if left.is_a?(Hash)     or right.is_a?(NilClass)
       
-      # Compare class names and hashes as a last resort if that fails.
-      right.class.name <=> left.class.name
+      # Try to use the class sort order so we don't have to do a string comparison.
+      left_order  = CLASS_ORDER[left.class]
+      right_order = CLASS_ORDER[right.class]
+      if left_order.nil? and right_order.nil?
+        left.class.name <=> right.class.name
+      else
+        (left_order || 9999) <=> (right_order || 9999)
+      end
     end
   end
 end
