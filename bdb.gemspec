@@ -2,7 +2,7 @@ BDB_SPEC = Gem::Specification.new do |s|
     s.platform  =   Gem::Platform::RUBY
     s.required_ruby_version = '>=1.8.4'
     s.name      =   "bdb"
-    s.version   =   "0.0.5"
+    s.version   =   "0.0.6"
     s.authors   =  ["Matt Bauer", "Dan Janowski"]
     s.email     =  "bauer@pedalbrain.com"
     s.summary   =   "A Ruby interface to BerkeleyDB"
