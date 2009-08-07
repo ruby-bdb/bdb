@@ -30,21 +30,33 @@ class Bdb::Simple
     db[Marshal.dump(key)] = Marshal.dump(value)
   end
 
-  def [](key)
-    key = Marshal.dump(key)
-    
-    if dup?
+  def [](key)    
+    if key.kind_of?(Range)
       values = []
       cursor = db.cursor(nil, 0)
-      data = cursor.get(key, nil, Bdb::DB_SET)
-      while data
-        values << Marshal.load(data[1])
-        data = cursor.get(nil, nil, Bdb::DB_NEXT_DUP)
+      k,v = cursor.get(Marshal.dump(key.first), nil, Bdb::DB_SET_RANGE)
+      while k and key.include?(Marshal.load(k))
+        values << Marshal.load(v)
+        k, v = cursor.get(nil, nil, Bdb::DB_NEXT)
       end
       cursor.close
       values
     else
-      Marshal.load(db.get(nil, key, nil, 0))
+      key = Marshal.dump(key)
+      if dup?
+        values = []
+        cursor = db.cursor(nil, 0)
+        k,v = cursor.get(key, nil, Bdb::DB_SET)
+        while data
+          values << Marshal.load(v)
+          k,v = cursor.get(nil, nil, Bdb::DB_NEXT_DUP)
+        end
+        cursor.close
+        values
+      else
+        v = db.get(nil, key, nil, 0)
+        Marshal.load(v) if v
+      end
     end
   end
 
