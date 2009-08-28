@@ -1102,17 +1102,23 @@ void assoc_key(DBT* result, VALUE obj) {
   result->flags=LMEMFLAG;
 }
 
-VALUE
-assoc_callback2(VALUE *args)
+VALUE assoc_call(VALUE *args)
 {
   return rb_funcall(args[0],fv_call,3,args[1],args[2],args[3]);
+}
+
+VALUE assoc_rescue(VALUE *error, VALUE e)
+{
+  VALUE message = StringValue(e);
+  rb_warn(RSTRING_PTR(message));
+  *error = e;
 }
 
 int assoc_callback(DB *secdb, const DBT* key, const DBT* data, DBT* result)
 {
   t_dbh *dbh;
   VALUE proc;
-  int status;
+  VALUE error = Qnil;
   VALUE retv;
   VALUE args[4];
   VALUE keys;
@@ -1130,15 +1136,15 @@ int assoc_callback(DB *secdb, const DBT* key, const DBT* data, DBT* result)
   fprintf(stderr,"assoc_data %*s", data->size, data->data);
 #endif
 
-  retv=rb_protect((VALUE(*)_((VALUE)))assoc_callback2,(VALUE)args,&status);
-
-  if (status) return 99999;
-  if ( NIL_P(retv) )
+  retv=rb_rescue((VALUE(*)_((VALUE)))assoc_call,(VALUE)args,(VALUE(*)_((VALUE)))assoc_rescue,(VALUE)&error);
+  
+  if (!NIL_P(error)) return 99999;
+  if (NIL_P(retv))
     return DB_DONOTINDEX;
 
   keys = rb_check_array_type(retv);
   if (!NIL_P(keys)) {
-      keys = rb_funcall(keys,fv_uniq,0); /* secondary keys must be uniq */
+    keys = rb_funcall(keys,fv_uniq,0); /* secondary keys must be uniq */
     switch(RARRAY(keys)->len) {
     case 0:
       return DB_DONOTINDEX;
@@ -1152,7 +1158,7 @@ int assoc_callback(DB *secdb, const DBT* key, const DBT* data, DBT* result)
       memset(result->data,0,result->size * sizeof(DBT));
     
       for (i=0; i<result->size; i++) {
-          assoc_key(result->data + i*sizeof(DBT), (VALUE)RARRAY(keys)->ptr[i]);
+        assoc_key(result->data + i*sizeof(DBT), (VALUE)RARRAY(keys)->ptr[i]);
       }
       return 0;
     }
