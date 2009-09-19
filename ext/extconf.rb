@@ -35,7 +35,7 @@ Then try building again.
 	end
 end
 
-versions=%w(db-4.7 db-4.6 db-4.5 db-4.4 db-4.3 db-4.2)
+versions=%w(db-4.8 db-4.7 db-4.6 db-4.5 db-4.4 db-4.3 db-4.2)
 until versions.empty?
   (lib_ok = have_library(versions.shift,'db_version', 'db.h')) && break
 end
