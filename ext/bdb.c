@@ -2317,6 +2317,54 @@ VALUE env_get_tx_max(VALUE obj)
 
 /*
  * call-seq:
+ * env.mutex_set_max(max) -> max
+ *
+ * Set the maximum number of mutexes with the environment
+ */
+VALUE env_mutex_set_max(VALUE obj, VALUE vmax)
+{
+  t_envh *eh;
+  u_int32_t max;
+  int rv;
+
+  max=FIX2UINT(vmax);
+
+  Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
+  rv=eh->env->mutex_set_max(eh->env,max);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_mutex_set_max: %s",db_strerror(rv));
+  }
+
+  return vmax;
+}
+
+/*
+ * call-seq
+ * env.mutex_get_max -> Fixnum
+ *
+ * Get current maximum number of mutexes.
+ */
+VALUE env_mutex_get_max(VALUE obj)
+{
+  t_envh *eh;
+  u_int32_t max;
+  int rv;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  if (!eh->env)
+    raise(0, "env is closed");
+  rv=eh->env->mutex_get_max(eh->env,&max);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_mutex_get_max: %s",db_strerror(rv));
+  }
+
+  return INT2FIX(max);
+}
+
+/*
+ * call-seq:
  * env.set_shm_key(key) -> max
  *
  * Set the shared memory key base
@@ -2935,6 +2983,8 @@ void Init_bdb() {
   rb_define_method(cEnv,"set_timeout",env_set_timeout,2);
   rb_define_method(cEnv,"get_timeout",env_get_timeout,1);
   rb_define_method(cEnv,"set_tx_max",env_set_tx_max,1);
+  rb_define_method(cEnv,"mutex_get_max",env_mutex_get_max,0);
+  rb_define_method(cEnv,"mutex_set_max",env_mutex_set_max,1);
   rb_define_method(cEnv,"get_tx_max",env_get_tx_max,0);
   rb_define_method(cEnv,"report_stderr",env_report_stderr,0);
   rb_define_method(cEnv,"set_lk_detect",env_set_lk_detect,1);
