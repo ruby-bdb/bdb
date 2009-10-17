@@ -1091,15 +1091,18 @@ VALUE db_del(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vflags)
 }
 
 void assoc_key(DBT* result, VALUE obj) {
-  VALUE str=StringValue(obj);
+  VALUE key = StringValue(obj);
+  int   len = RSTRING_LEN(key);
+  char *str = malloc(len);
+  memcpy(str, RSTRING_PTR(key), len);
 
 #ifdef DEBUG_DB
-  fprintf(stderr,"assoc_key %*s", RSTRING_LEN(str),RSTRING_PTR(str));
+  fprintf(stderr,"assoc_key %*s", len, str);
 #endif
 
-  result->data=RSTRING_PTR(str);
-  result->size=RSTRING_LEN(str);
-  result->flags=LMEMFLAG;
+  result->size  = len;
+  result->flags = LMEMFLAG | DB_DBT_APPMALLOC;
+  result->data  = str;
 }
 
 VALUE assoc_call(VALUE *args)
@@ -1114,7 +1117,7 @@ VALUE assoc_rescue(VALUE *error, VALUE e)
   *error = e;
 }
 
-int assoc_callback(DB *secdb, const DBT* key, const DBT* data, DBT* result)
+int assoc_callback(DB *secdb, const DBT* pkey, const DBT* data, DBT* skey)
 {
   t_dbh *dbh;
   VALUE proc;
@@ -1124,12 +1127,12 @@ int assoc_callback(DB *secdb, const DBT* key, const DBT* data, DBT* result)
   VALUE keys;
   int i;
 
-  memset(result,0,sizeof(DBT));
+  memset(skey,0,sizeof(DBT));
   dbh=secdb->app_private;
 
   args[0]=dbh->aproc;
   args[1]=dbh->self;
-  args[2]=rb_str_new(key->data,key->size);
+  args[2]=rb_str_new(pkey->data,pkey->size);
   args[3]=rb_str_new(data->data,data->size);
 
 #ifdef DEBUG_DB
@@ -1152,19 +1155,19 @@ int assoc_callback(DB *secdb, const DBT* key, const DBT* data, DBT* result)
       retv=RARRAY(keys)->ptr[0];
       break;
     default:
-      result->size=RARRAY(keys)->len;
-      result->flags=DB_DBT_MULTIPLE | DB_DBT_APPMALLOC;
-      result->data=malloc(result->size * sizeof(DBT));
-      memset(result->data,0,result->size * sizeof(DBT));
+      skey->size  = RARRAY(keys)->len;
+      skey->flags = LMEMFLAG | DB_DBT_MULTIPLE | DB_DBT_APPMALLOC;
+      skey->data  = malloc(skey->size * sizeof(DBT));
+      memset(skey->data, 0, skey->size * sizeof(DBT));
     
-      for (i=0; i<result->size; i++) {
-        assoc_key(result->data + i*sizeof(DBT), (VALUE)RARRAY(keys)->ptr[i]);
+      for (i=0; i<skey->size; i++) {
+        assoc_key(skey->data + i * sizeof(DBT), (VALUE)RARRAY(keys)->ptr[i]);
       }
       return 0;
     }
   }
 
-  assoc_key(result, retv);
+  assoc_key(skey, retv);
   return 0;
 }
 

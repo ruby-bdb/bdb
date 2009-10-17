@@ -3,69 +3,102 @@ require 'bdb' if not defined?(Bdb)
 class Bdb::Simple
   include Enumerable
 
-  def initialize(file, opts = {})
-    @dup  = opts[:dup]
-    @file = file
+  def initialize(path, opts = {})
+    @dup = opts[:dup] ? true : false
+
+    if opts[:raw]
+      @raw  = true
+      @sort = false
+    else
+      @raw  = false
+      @sort = opts[:sort] == false ? false : true
+    end
+
+    @name = opts[:name] || 'default'
+    @path = path
   end
 
-  def dup?
-    @dup
-  end
+  def dup?;  @dup;  end
+  def sort?; @sort; end
+  def raw?;  @raw;  end
 
-  attr_reader :file
+  attr_reader :path, :name
+
+  def env
+    if @env.nil?
+      @env = Bdb::Env.new(0)
+      env_flags = Bdb::DB_CREATE    | # Create the environment if it does not already exist.
+                  Bdb::DB_INIT_TXN  | # Initialize transactions.
+                  Bdb::DB_INIT_LOCK | # Initialize locking.
+                  Bdb::DB_INIT_LOG  | # Initialize logging.
+                  Bdb::DB_INIT_MPOOL  # Initialize the in-memory cache.
+      # @env.set_lk_detect(Bdb::DB_LOCK_DEFAULT)
+      @env.open(path, env_flags, 0);
+    end
+    @env
+  end
 
   def db
     if @db.nil?
-      @db = Bdb::Db.new
+      @db = env.db
       @db.flags = Bdb::DB_DUPSORT if dup?
-      @db.btree_compare = lambda do |db, key1, key2|
-        self.class.compare_absolute(Marshal.load(key1), Marshal.load(key2))
+      if sort?
+        @db.btree_compare = lambda do |db, key1, key2|
+          self.class.compare_absolute(Marshal.load(key1), Marshal.load(key2))
+        end
       end
-      @db.open(nil, file, nil, Bdb::Db::BTREE, Bdb::DB_CREATE, 0)    
+      @db.open(nil, name, nil, Bdb::Db::BTREE, Bdb::DB_CREATE | Bdb::DB_AUTO_COMMIT, 0)    
     end
     @db
   end
 
   def []=(key, value)
-    db[Marshal.dump(key)] = Marshal.dump(value)
+    db.put(nil, dump(key), dump(value), 0)
   end
 
   def delete(key)
-    db.del(nil, Marshal.dump(key), 0)
+    db.del(nil, dump(key), 0)
+  end
+
+  def update(key)
+    k = dump(key)
+    txn = env.txn_begin(nil, 0)
+    begin
+      v = db.get(txn, k, nil, Bdb::DB_RMW)
+      value = yield(load(v))
+      db.put(txn, k, dump(value), 0)
+      txn.commit(0)
+    rescue Exception => e
+      txn.abort
+      raise e
+    end
+    value
   end
 
   def [](key)    
     if key.kind_of?(Range) or dup?
-      Bdb::SimpleSet.new(db, key)
+      Bdb::SimpleSet.new(self, key)
     else
-      v = db.get(nil, Marshal.dump(key), nil, 0)
-      Marshal.load(v) if v
+      v = db.get(nil, dump(key), nil, 0)
+      load(v)
     end
   end
 
   def each
     cursor = db.cursor(nil, 0)
     while data = cursor.get(nil, nil, Bdb::DB_NEXT)
-      key   = Marshal.load(data[0])
-      value = Marshal.load(data[1])      
+      key   = load(data[0])
+      value = load(data[1])      
       yield(key, value)
     end
     cursor.close
   end
 
-  def sync
-    db.sync
-  end
-  
-  def clear
-    close
-    File.delete(file) if File.exists?(file)
-    nil
-  end
-
   def close
     db.close(0)
-    @db = nil
+    env.close
+    @db  = nil
+    @env = nil
   end
 
   CLASS_ORDER = {}
@@ -113,34 +146,55 @@ class Bdb::Simple
       end
     end
   end
+
+private
+  
+  def load(value)
+    return unless value
+    raw? ? value : Marshal.load(value)
+  end
+
+  def dump(value)
+    raw? ? value.to_s : Marshal.dump(value)
+  end  
 end
 
 class Bdb::SimpleSet
   include Enumerable
   
-  def initialize(db, key)
-    @db  = db
-    @key = key
+  def initialize(source, key)
+    @source = source
+    @key    = key
   end
-  attr_reader :db, :key
+  attr_reader :source, :key
   
   def each
     if key.kind_of?(Range)
-      cursor = db.cursor(nil, 0)
-      k,v = cursor.get(Marshal.dump(key.first), nil, Bdb::DB_SET_RANGE)
-      while k and key.include?(Marshal.load(k))
-        yield Marshal.load(v)
+      cursor = source.db.cursor(nil, 0)
+      k,v = cursor.get(dump(key.first), nil, Bdb::DB_SET_RANGE)
+      while k and key.include?(load(k))
+        yield load(v)
         k, v = cursor.get(nil, nil, Bdb::DB_NEXT)
       end
       cursor.close
     else
-      cursor = db.cursor(nil, 0)
-      k,v = cursor.get(Marshal.dump(key), nil, Bdb::DB_SET)
+      cursor = source.db.cursor(nil, 0)
+      k,v = cursor.get(dump(key), nil, Bdb::DB_SET)
       while k
-        yield Marshal.load(v)
+        yield load(v)
         k,v = cursor.get(nil, nil, Bdb::DB_NEXT_DUP)
       end
       cursor.close
     end
+  end
+
+private
+
+  def load(value)
+    source.send(:load, value)
+  end
+
+  def dump(value)
+    source.send(:dump, value)
   end
 end
