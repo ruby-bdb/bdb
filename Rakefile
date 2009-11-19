@@ -1,41 +1,57 @@
 require 'rubygems'
-require 'rake/gempackagetask'
-require 'rake/rdoctask'
+require 'rake'
+
+begin
+  require 'jeweler'
+  Jeweler::Tasks.new do |gem|
+    gem.name = "bdb"
+    gem.summary = %Q{Ruby Berkeley DB}
+    gem.description = %Q{Advanced Ruby Berkeley DB library.}
+    gem.email = "code@justinbalthrop.com"
+    gem.homepage = "http://github.com/ninjudd/bdb"
+    gem.authors = ["Justin Balthrop"]
+    gem.files = ["README.rdoc", "VERSION", "ext/*", "lib/**/*.rb", "test/*.rb"]
+    gem.extensions = ["ext/extconf.rb"]
+    gem.require_paths = ["ext", "lib"]
+  end
+rescue LoadError
+  puts "Jeweler (or a dependency) not available. Install it with: sudo gem install jeweler"
+end
+
 require 'rake/testtask'
+Rake::TestTask.new(:test) do |test|
+  test.libs << 'lib' << 'test' << 'ext'
+  test.pattern = 'test/**/*_test.rb'
+  test.verbose = true
+end
 
-load 'bdb.gemspec'
- 
-Rake::GemPackageTask.new(BDB_SPEC) do |pkg|
-    pkg.need_tar = true
+begin
+  require 'rcov/rcovtask'
+  Rcov::RcovTask.new do |test|
+    test.libs << 'test'
+    test.pattern = 'test/**/*_test.rb'
+    test.verbose = true
+  end
+rescue LoadError
+  task :rcov do
+    abort "RCov is not available. In order to run rcov, you must: sudo gem install spicycode-rcov"
+  end
 end
- 
-task :default => "test"
 
-desc "Clean"
-task :clean do
-  include FileUtils
-  Dir.chdir('ext') do
-    rm(Dir.glob('*') - ['bdb.c', 'bdb.h', 'extconf.rb'])
+task :test => :check_dependencies
+
+task :default => :test
+
+require 'rake/rdoctask'
+Rake::RDocTask.new do |rdoc|
+  if File.exist?('VERSION')
+    version = File.read('VERSION')
+  else
+    version = ""
   end
-  rm_rf 'pkg'
-end
- 
-desc "Run tests"
-Rake::TestTask.new("test") do |t|
-  t.libs.concat ["test", "ext"]
-  t.pattern = 'test/*_test.rb'
-  t.verbose = true
-  t.warning = true
-end
- 
-task :doc => [:rdoc]
-namespace :doc do
-  Rake::RDocTask.new do |rdoc|
-    files = ["README", "lib/**/*.rb"]
-    rdoc.rdoc_files.add(files)
-    rdoc.main = "README.textile"
-    rdoc.title = "Bdb Docs"
-    rdoc.rdoc_dir = "doc"
-    rdoc.options << "--line-numbers" << "--inline-source"
-  end
+
+  rdoc.rdoc_dir = 'rdoc'
+  rdoc.title = "bdb #{version}"
+  rdoc.rdoc_files.include('README*')
+  rdoc.rdoc_files.include('lib/**/*.rb')
 end
