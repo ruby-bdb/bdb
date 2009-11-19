@@ -26,11 +26,11 @@ class Bdb::Database
         primary_db = environment.env.db
         primary_db.pagesize = config[:page_size] if config[:page_size]
         primary_db.open(transaction, name, nil, Bdb::Db::BTREE, Bdb::DB_CREATE, 0)
-        @db[:primary] = primary_db
+        @db[:primary_key] = primary_db
 
         indexes.each do |field, opts|
           index_callback = lambda do |db, key, data|
-            value = Marshal.load(data)          
+            value = Marshal.load(data)
             index_key = value.kind_of?(Hash) ? value[:field] : value.send(field)
             if opts[:multi_key] and index_key.kind_of?(Array)
               # Index multiple keys. If the key is an array, you must wrap it with an outer array.
@@ -49,7 +49,7 @@ class Bdb::Database
         end
       end
     end
-    @db[index || :primary]
+    @db[index || :primary_key]
   end
 
   def close
@@ -73,22 +73,17 @@ class Bdb::Database
     set   = ResultSet.new(opts, &block)
     flags = opts[:modify] ? Bdb::DB_RMW : 0
     flags = 0 if environment.disable_transactions?
-
+    
     keys.each do |key|
-      if opts[:partial] and not key.kind_of?(Range) and not key == :all
-        first = [*key]
-        last  = first + [true]
-        key   = first..last
-      end
-
+      key = get_key(key, opts)
       if key == :all
         with_cursor(db) do |cursor|          
           if opts[:reverse]
-            k,v  = cursor.get(nil, nil, Bdb::DB_LAST | flags) # Start at the last item.
-            iter = lambda {cursor.get(nil, nil, Bdb::DB_PREV | flags)}       # Move backward.
+            k,v  = cursor.get(nil, nil, Bdb::DB_LAST | flags)          # Start at the last item.
+            iter = lambda {cursor.get(nil, nil, Bdb::DB_PREV | flags)} # Move backward.
           else
-            k,v  = cursor.get(nil, nil, Bdb::DB_FIRST | flags) # Start at the first item.
-            iter = lambda {cursor.get(nil, nil, Bdb::DB_NEXT | flags)}        # Move forward.
+            k,v  = cursor.get(nil, nil, Bdb::DB_FIRST | flags)         # Start at the first item.
+            iter = lambda {cursor.get(nil, nil, Bdb::DB_NEXT | flags)} # Move forward.
           end
 
           while k
@@ -189,6 +184,15 @@ class Bdb::Database
 
 private
 
+  def get_key(key, opts)
+    if opts[:partial] and not key.kind_of?(Range) and not key == :all
+      first = [*key]
+      last  = first + [true]
+      key   = first..last
+    end
+    key
+  end
+
   def unmarshal(value, opts = {})
     value = Marshal.load(value)
     value.bdb_locator_key = opts[:tuple] ? Tuple.load(opts[:tuple]) : [*opts[:key]]
@@ -227,13 +231,13 @@ private
     attr_reader :count, :group, :limit, :offset, :results
 
     def <<(item)
-      key = item[1]
       @count += 1
       return if count <= offset
 
       raise LimitReached if limit and count > limit + offset
 
       if group
+        key = item.bdb_locator_key
         group_key = group.is_a?(Fixnum) ? key[0,group] : key
         (results[group_key] ||= []) << item
       elsif @block
