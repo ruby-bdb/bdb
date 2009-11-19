@@ -1,23 +1,11 @@
-require 'bdb'
-require 'tuple'
-require File.dirname(__FILE__) + '/environment'
+require 'bdb/base'
 
-class Bdb::Database
+class Bdb::Database < Bdb::Base
   def initialize(name, opts = {})
-    @name    = name
-    @config  = Bdb::Environment.config.merge(opts)
-    @indexes = {}
+    @name = name
+    super(opts)
   end
-  attr_reader :name, :indexes
-
-  def config(config = {})
-    @config.merge!(config)
-  end
-
-  def index_by(field, opts = {})
-    raise "index on #{field} already exists" if indexes[field]
-    indexes[field] = opts
-  end
+  attr_reader :name
 
   def db(index = nil)
     if @db.nil?
@@ -70,7 +58,7 @@ class Bdb::Database
   def get(*keys, &block)
     opts  = keys.last.kind_of?(Hash) ? keys.pop : {}
     db    = db(opts[:field])
-    set   = ResultSet.new(opts, &block)
+    set   = Bdb::ResultSet.new(opts, &block)
     flags = opts[:modify] ? Bdb::DB_RMW : 0
     flags = 0 if environment.disable_transactions?
     
@@ -139,7 +127,7 @@ class Bdb::Database
       end
     end
     set.results
-  rescue ResultSet::LimitReached
+  rescue Bdb::ResultSet::LimitReached
     set.results
   end
 
@@ -164,22 +152,6 @@ class Bdb::Database
     synchronize do
       db.truncate(transaction)
     end
-  end
-
-  def environment
-    @environment ||= Bdb::Environment.new(config[:path], self)
-  end
-
-  def transaction(nested = true, &block)
-    environment.transaction(nested, &block)
-  end
-  
-  def synchronize(&block)
-    environment.synchronize(&block)
-  end
-
-  def checkpoint(opts = {})
-    environment.synchronize(opts)
   end
 
 private
@@ -207,61 +179,6 @@ private
       ensure
         cursor.close if cursor
       end
-    end
-  end
-
-  class ResultSet
-    class LimitReached < Exception; end
-
-    def initialize(opts, &block)
-      @block  = block
-      @count  = 0
-      @limit  = opts[:limit] || opts[:per_page]
-      @limit  = @limit.to_i if @limit
-      @offset = opts[:offset] || (opts[:page] ? @limit * (opts[:page] - 1) : 0)
-      @offset = @offset.to_i if @offset
-
-      if @group = opts[:group]
-        raise 'block not supported with group' if @block     
-        @results = {}
-      else
-        @results = []
-      end
-    end
-    attr_reader :count, :group, :limit, :offset, :results
-
-    def <<(item)
-      @count += 1
-      return if count <= offset
-
-      raise LimitReached if limit and count > limit + offset
-
-      if group
-        key = item.bdb_locator_key
-        group_key = group.is_a?(Fixnum) ? key[0,group] : key
-        (results[group_key] ||= []) << item
-      elsif @block
-        @block.call(item)
-      else
-        results << item
-      end
-    end
-  end
-end
-
-class Object
-  attr_accessor :bdb_locator_key
-end
-
-# Array comparison should try Tuple comparison first.
-class Array
-  cmp = instance_method(:<=>)
-
-  define_method(:<=>) do |other|
-    begin
-      Tuple.dump(self) <=> Tuple.dump(other)
-    rescue TypeError => e
-      cmp.bind(self).call(other)
     end
   end
 end
