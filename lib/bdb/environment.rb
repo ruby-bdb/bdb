@@ -1,8 +1,9 @@
 class Bdb::Environment
   @@env = {}
-  def self.new(path, database)
+  def self.new(path, database = nil)
+    path = File.expand_path(path)
     @@env[path] ||= super(path)
-    @@env[path].databases << database
+    @@env[path].databases << database if database
     @@env[path]
   end
 
@@ -38,7 +39,7 @@ class Bdb::Environment
           env_flags = Bdb::DB_CREATE | Bdb::DB_INIT_MPOOL
         else
           env_flags = Bdb::DB_CREATE | Bdb::DB_INIT_TXN | Bdb::DB_INIT_LOCK |
-                      Bdb::DB_REGISTER | Bdb::DB_RECOVER | Bdb::DB_INIT_MPOOL
+                      Bdb::DB_REGISTER | Bdb::DB_RECOVER | Bdb::DB_INIT_MPOOL | Bdb::DB_THREAD
         end
 
         @env.cachesize = config[:cache_size] if config[:cache_size]

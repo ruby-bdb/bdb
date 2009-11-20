@@ -61,7 +61,7 @@ class Bdb::Database < Bdb::Base
     set   = Bdb::ResultSet.new(opts, &block)
     flags = opts[:modify] ? Bdb::DB_RMW : 0
     flags = 0 if environment.disable_transactions?
-    
+
     keys.each do |key|
       key = get_key(key, opts)
       if key == :all

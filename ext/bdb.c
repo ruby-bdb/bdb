@@ -616,20 +616,22 @@ VALUE db_get(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vdata, VALUE vflags)
 
   StringValue(vkey);
 
-  key.data = RSTRING_PTR(vkey);
-  key.size = RSTRING_LEN(vkey);
-  key.flags = LMEMFLAG;
+  key.data  = RSTRING_PTR(vkey);
+  key.size  = RSTRING_LEN(vkey);
+  key.flags = LMEMFLAG;  
 
   if ( ! NIL_P(vdata) ) {
     StringValue(vdata);
     data.data = RSTRING_PTR(vdata);
     data.size = RSTRING_LEN(vdata);
-    data.flags = LMEMFLAG;
   }
+  data.flags = DB_DBT_MALLOC;
 
   rv = dbh->db->get(dbh->db,txn?txn->txn:NULL,&key,&data,flags);
   if ( rv == 0 ) {
-    return rb_str_new(data.data,data.size);
+    str = rb_str_new(data.data,data.size);
+    if (data.data) free(data.data);
+    return str;
   } else if (rv == DB_NOTFOUND) {
     return Qnil;
   } else {
