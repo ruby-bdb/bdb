@@ -7,7 +7,7 @@ h2. Download
 Currently this library is available via git at:
 
 <pre>
-   git://github.com/mattbauer/bdb.git
+   git://github.com/ninjudd/bdb.git
 </pre>
 
 h2. Installation
@@ -17,22 +17,22 @@ h3. From Git
 You can check out the latest source from git:
 
 <pre>
-   git clone git://github.com/mattbauer/bdb.git
+   git clone git://github.com/ninjudd/bdb.git
 </pre>
 
 h3. As a Gem
 
 At the moment this library is not available on Rubyforge.  To install it as a
-gem, do the following (for custom compiled version 4.7):
+gem, do the following (for custom compiled version 4.8):
 
 <pre>
-   sudo env ARCHFLAGS="-arch i386" gem install mattbauer-bdb --source http://gems.github.com -- --with-db-dir=/usr/local/BerkeleyDB.4.7
+   sudo env ARCHFLAGS="-arch i386" gem install bdb --source http://gemcutter.org -- --with-db-dir=/usr/local/BerkeleyDB.4.8
 </pre>
 
-For Berkeley DB v4.6 installed from MacPorts do the following:
+For Berkeley DB v4.7 installed from MacPorts do the following:
 
 <pre>
-   sudo env ARCHFLAGS="-arch i386" gem install mattbauer-bdb --source http://gems.github.com -- --with-db-include=/opt/local/include/db46 --with-db-lib=/opt/local/lib/db46
+   sudo env ARCHFLAGS="-arch i386" gem install bdb --source http://gemcutter.org -- --with-db-include=/opt/local/include/db47 --with-db-lib=/opt/local/lib/db47
 </pre>
 
 This assumes you're on OS X and BerkeleyDB wasn't compiled as a universal binary.
