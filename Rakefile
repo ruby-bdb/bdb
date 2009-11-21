@@ -14,6 +14,7 @@ begin
     gem.extensions = ["ext/extconf.rb"]
     gem.require_paths = ["ext", "lib"]
   end
+  Jeweler::GemcutterTasks.new
 rescue LoadError
   puts "Jeweler (or a dependency) not available. Install it with: sudo gem install jeweler"
 end
