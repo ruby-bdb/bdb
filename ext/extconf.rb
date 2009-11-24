@@ -1,43 +1,11 @@
 #!/usr/bin/env ruby
 require 'mkmf'
-
-inc, lib = dir_config('db')
-
-# OS X compatibility
-if(PLATFORM =~ /darwin/) then
-	# test if Bdb is probably universal
-	
-	filetype = (IO.popen("file #{inc}/../db_dump").readline.chomp rescue nil)
-	# if it's not universal, ARCHFLAGS should be set
-	if((filetype !~ /universal binary/) && ENV['ARCHFLAGS'].nil?) then
-		arch = (IO.popen("uname -m").readline.chomp rescue nil)
-		$stderr.write %{
-===========   WARNING   ===========
-
-You are building this extension on OS X without setting the 
-ARCHFLAGS environment variable, and BerkeleyDB does not appear 
-to have been built as a universal binary. If you are seeing this 
-message, that means that the build will probably fail.
-
-Try setting the environment variable ARCHFLAGS 
-to '-arch #{arch}' before building.
-
-For example:
-(in bash) $ export ARCHFLAGS='-arch #{arch}'
-(in tcsh) % setenv ARCHFLAGS '-arch #{arch}'
-
-Then try building again.
-
-===================================
-
-}
-		# We don't exit here. Who knows? It might build.
-	end
-end
+default_dir = '/usr/local/BerkeleyDB.4.8'
+inc, lib = dir_config('db', "#{default_dir}/include", "#{default_dir}/lib")
 
 versions=%w(db-4.8 db-4.7 db-4.6 db-4.5 db-4.4 db-4.3 db-4.2)
 until versions.empty?
-  (lib_ok = have_library(versions.shift,'db_version', 'db.h')) && break
+  (lib_ok = have_library(versions.shift, 'db_version', 'db.h')) && break
 end
 
 def create_header
