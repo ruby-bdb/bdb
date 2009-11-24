@@ -1,1 +1,6 @@
+ext/Makefile
+ext/bdb.bundle
+ext/bdb.o
+ext/bdb_aux._c
+ext/mkmf.log
 pkg
