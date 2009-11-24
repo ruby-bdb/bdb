@@ -267,9 +267,9 @@ VALUE db_open(VALUE obj, VALUE vtxn, VALUE vdisk_file,
   
   dbh->db->app_private=dbh;
   rv = dbh->db->open(dbh->db,txn?txn->txn:NULL,
-		     StringValueCStr(vdisk_file),
-		     logical_db,
-		     dbtype,flags,mode);
+                     StringValueCStr(vdisk_file),
+                     logical_db,
+                     dbtype,flags,mode);
   if (rv != 0) {
     raise_error(rv,"db_open failure: %s(%d)",db_strerror(rv),rv);
   }
@@ -1637,6 +1637,8 @@ VALUE env_open(VALUE obj, VALUE vhome, VALUE vflags, VALUE vmode)
     raise_error(0,"env handle already used and closed");
 
   rv = eh->env->open(eh->env,StringValueCStr(vhome),flags,mode);
+  eh->env->app_private=eh;
+
   if (rv != 0) {
     raise_error(rv, "env_open failure: %s",db_strerror(rv));
   }
@@ -2749,6 +2751,205 @@ VALUE env_get_home(VALUE obj)
   return rb_str_new2(home);
 }
 
+/*
+ * call-seq:
+ * env.set_verbose(which, onoff)
+ *
+ * set verbose messages on or off
+ */
+VALUE env_set_verbose(VALUE obj, VALUE which, VALUE onoff)
+{
+  t_envh *eh;
+  int rv;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  rv = eh->env->set_verbose(eh->env, NUM2UINT(which), RTEST(onoff));
+
+  if ( rv != 0 )  raise_error(rv, "env_set_verbose: %s",db_strerror(rv));
+
+  return Qtrue;
+}
+
+/*
+ * call-seq:
+ * env.rep_priority = int
+ *
+ * specify how the replication manager will handle acknowledgement of replication messages
+ */
+VALUE env_rep_set_priority(VALUE obj, VALUE priority)
+{
+  t_envh *eh;
+  int rv;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  rv = eh->env->rep_set_priority(eh->env, NUM2UINT(priority));
+
+  if ( rv != 0 ) raise_error(rv, "env_rep_set_priority: %s", db_strerror(rv));
+  return priority;
+}
+
+/*
+ * call-seq:
+ * env.rep_priority -> int
+ *
+ * returns the replication manager's acknowledgement policy
+ */
+VALUE env_rep_get_priority(VALUE obj)
+{
+  t_envh *eh;
+  u_int32_t priority;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  eh->env->rep_get_priority(eh->env, &priority);
+
+  return INT2NUM(priority);
+}
+
+/*
+ * call-seq:
+ * env.rep_nsites = int
+ *
+ * specify how the replication manager will handle acknowledgement of replication messages
+ */
+VALUE env_rep_set_nsites(VALUE obj, VALUE nsites)
+{
+  t_envh *eh;
+  int rv;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  rv = eh->env->rep_set_nsites(eh->env, NUM2UINT(nsites));
+
+  if ( rv != 0 ) raise_error(rv, "env_rep_set_nsites: %s", db_strerror(rv));
+  return nsites;
+}
+
+/*
+ * call-seq:
+ * env.rep_nsites -> int
+ *
+ * returns the replication manager's acknowledgement policy
+ */
+VALUE env_rep_get_nsites(VALUE obj)
+{
+  t_envh *eh;
+  u_int32_t nsites;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  eh->env->rep_get_nsites(eh->env, &nsites);
+
+  return INT2NUM(nsites);
+}
+
+
+/*
+ * call-seq:
+ * env.repmgr_set_local_site(host, port)
+ *
+ * specify the local site for the replication manager
+ */
+VALUE env_repmgr_set_local_site(VALUE obj, VALUE host, VALUE port)
+{
+  t_envh *eh;
+  int rv;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  rv = eh->env->repmgr_set_local_site(eh->env, StringValuePtr(host), NUM2UINT(port), 0);
+
+  if ( rv != 0 ) raise_error(rv, "env_repmgr_set_local_site: %s", db_strerror(rv));
+  return Qtrue;
+}
+
+/*
+ * call-seq:
+ * env.repmgr_add_remote_site(host, port)
+ *
+ * add a remote for the replication manager
+ */
+VALUE env_repmgr_add_remote_site(VALUE obj, VALUE host, VALUE port)
+{
+  t_envh *eh;
+  int rv;
+  int eidp;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  rv = eh->env->repmgr_add_remote_site(eh->env, StringValuePtr(host), NUM2UINT(port), &eidp, 0);
+
+  if ( rv != 0 ) raise_error(rv, "env_repmgr_add_remote_site: %s", db_strerror(rv));
+  return INT2NUM(eidp);
+}
+
+/*
+ * call-seq:
+ * env.repmgr_ack_policy = int
+ *
+ * specify how the replication manager will handle acknowledgement of replication messages
+ */
+VALUE env_repmgr_set_ack_policy(VALUE obj, VALUE policy)
+{
+  t_envh *eh;
+  int rv;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  rv = eh->env->repmgr_set_ack_policy(eh->env, NUM2INT(policy));
+
+  if ( rv != 0 ) raise_error(rv, "env_repmgr_set_ack_policy: %s", db_strerror(rv));
+  return policy;
+}
+
+/*
+ * call-seq:
+ * env.repmgr_ack_policy -> int
+ *
+ * returns the replication manager's acknowledgement policy
+ */
+VALUE env_repmgr_get_ack_policy(VALUE obj)
+{
+  t_envh *eh;
+  int policy;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  eh->env->repmgr_get_ack_policy(eh->env, &policy);
+
+  return INT2NUM(policy);
+}
+
+/*
+ * call-seq:
+ * env.repmgr_start(num_threads, flags)
+ *
+ * start the replication manager
+ */
+VALUE env_repmgr_start(VALUE obj, VALUE num_threads, VALUE flags)
+{
+  t_envh *eh;
+  int rv;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  rv = eh->env->repmgr_start(eh->env, NUM2INT(num_threads), NUM2UINT(flags));
+
+  if ( rv != 0 ) raise_error(rv, "env_repmgr_start: %s", db_strerror(rv));
+  return Qtrue;
+}
+
+/*
+ * call-seq:
+ * env.repmgr_stat_print
+ *
+ * prints replication manager stats
+ */
+VALUE env_repmgr_stat_print(VALUE obj, VALUE flags)
+{
+  t_envh *eh;
+  int rv;
+
+  Data_Get_Struct(obj,t_envh,eh);
+  rv = eh->env->repmgr_stat_print(eh->env, NUM2UINT(flags));
+
+  if ( rv != 0 ) raise_error(rv, "env_repmgr_stat_print: %s", db_strerror(rv));
+  return Qtrue;
+}
+
+
 static void txn_finish(t_txnh *txn)
 {
   if ( RTEST(ruby_debug) )
@@ -2935,7 +3136,7 @@ void Init_bdb() {
   rb_define_method(cDb,"associate",db_associate,4);
   rb_define_method(cDb,"btree_compare=",db_btree_compare_set,1);
   rb_define_method(cDb,"flags=",db_flags_set,1);
-	rb_define_method(cDb,"flags",db_flags_get,0);
+  rb_define_method(cDb,"flags",db_flags_get,0);
   rb_define_method(cDb,"open",db_open,6);
   rb_define_method(cDb,"close",db_close,1);
   rb_define_method(cDb,"[]",db_aget,1);
@@ -2977,8 +3178,8 @@ void Init_bdb() {
   rb_define_method(cEnv,"close",env_close,0);
   rb_define_method(cEnv,"db",env_db,0);
   rb_define_method(cEnv,"cachesize=",env_set_cachesize,1);
- 	rb_define_method(cEnv,"cachesize",env_get_cachesize,0);
-	rb_define_method(cEnv,"flags",env_get_flags,0);
+  rb_define_method(cEnv,"cachesize",env_get_cachesize,0);
+  rb_define_method(cEnv,"flags",env_get_flags,0);
   rb_define_method(cEnv,"flags_on=",env_set_flags_on,1);
   rb_define_method(cEnv,"flags_off=",env_set_flags_off,1);
   rb_define_method(cEnv,"list_dbs",env_list_dbs,0);
@@ -2995,19 +3196,31 @@ void Init_bdb() {
   rb_define_method(cEnv,"set_lk_detect",env_set_lk_detect,1);
   rb_define_method(cEnv,"get_lk_detect",env_get_lk_detect,0);
   rb_define_method(cEnv,"set_lk_max_locks",env_set_lk_max_locks,1);
-	rb_define_method(cEnv,"get_lk_max_locks",env_get_lk_max_locks,0);
+  rb_define_method(cEnv,"get_lk_max_locks",env_get_lk_max_locks,0);
   rb_define_method(cEnv,"set_lk_max_objects",env_set_lk_max_objects,1);
-	rb_define_method(cEnv,"get_lk_max_objects",env_get_lk_max_objects,0);
+  rb_define_method(cEnv,"get_lk_max_objects",env_get_lk_max_objects,0);
   rb_define_method(cEnv,"set_shm_key",env_set_shm_key,1);
   rb_define_method(cEnv,"get_shm_key",env_get_shm_key,0);
 
   rb_define_method(cEnv,"set_data_dir",env_set_data_dir,1);
-	rb_define_method(cEnv,"get_data_dirs",env_get_data_dirs,0);
+  rb_define_method(cEnv,"get_data_dirs",env_get_data_dirs,0);
   rb_define_method(cEnv,"set_lg_dir",env_set_lg_dir,1);
-	rb_define_method(cEnv,"get_lg_dir",env_get_lg_dir,0);
+  rb_define_method(cEnv,"get_lg_dir",env_get_lg_dir,0);
   rb_define_method(cEnv,"set_tmp_dir",env_set_tmp_dir,1);
-	rb_define_method(cEnv,"get_tmp_dir",env_get_tmp_dir,0);
-	rb_define_method(cEnv,"get_home",env_get_home,0);
+  rb_define_method(cEnv,"get_tmp_dir",env_get_tmp_dir,0);
+  rb_define_method(cEnv,"get_home",env_get_home,0);
+  rb_define_method(cEnv,"set_verbose",env_set_verbose,2);
+
+  rb_define_method(cEnv,"rep_priority=", env_rep_set_priority, 1);
+  rb_define_method(cEnv,"rep_priority", env_rep_get_priority, 0);
+  rb_define_method(cEnv,"rep_nsites=", env_rep_set_nsites, 1);
+  rb_define_method(cEnv,"rep_nsites", env_rep_get_nsites, 0);
+  rb_define_method(cEnv,"repmgr_set_local_site", env_repmgr_set_local_site, 2);
+  rb_define_method(cEnv,"repmgr_add_remote_site", env_repmgr_add_remote_site, 2);
+  rb_define_method(cEnv,"repmgr_ack_policy=", env_repmgr_set_ack_policy, 1);
+  rb_define_method(cEnv,"repmgr_ack_policy", env_repmgr_get_ack_policy, 0);
+  rb_define_method(cEnv,"repmgr_start", env_repmgr_start, 2);
+  rb_define_method(cEnv,"repmgr_stat_print", env_repmgr_stat_print, 1);
 
   cTxnStat = rb_define_class_under(mBdb,"TxnStat",rb_cObject);
   rb_define_method(cTxnStat,"[]",stat_aref,1);

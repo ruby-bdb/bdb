@@ -19,8 +19,12 @@ class Bdb::Base
     indexes[field] = opts
   end
   
+  def path
+    config[:path] || Dir.pwd
+  end
+
   def environment
-    @environment ||= Bdb::Environment.new(config[:path], self)
+    @environment ||= Bdb::Environment.new(path, self)
   end
   
   def transaction(nested = true, &block)
@@ -32,9 +36,13 @@ class Bdb::Base
   end
   
   def checkpoint(opts = {})
-    environment.synchronize(opts)
+    environment.checkpoint(opts)
   end
-  
+
+  def master?
+    environment.master?
+  end
+
 private
 
   def get_field(field, value)

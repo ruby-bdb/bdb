@@ -1,10 +1,23 @@
+require 'thread'
+require 'bdb/replication'
+
 class Bdb::Environment
   @@env = {}
   def self.new(path, database = nil)
+    # Only allow one environment per path.
     path = File.expand_path(path)
     @@env[path] ||= super(path)
     @@env[path].databases << database if database
     @@env[path]
+  end
+
+  def initialize(path)
+    @path = path
+  end
+  attr_reader :path
+
+  def self.[](path)
+    new(path)
   end
 
   def self.config(config = {})
@@ -22,10 +35,10 @@ class Bdb::Environment
     @config.merge!(config)
   end
 
-  def initialize(path)
-    @path = path
+  include Replication
+  def self.replicate(path, opts)
+    self[path].replicate(opts)
   end
-  attr_reader :path
 
   def databases
     @databases ||= []
@@ -40,16 +53,19 @@ class Bdb::Environment
         else
           env_flags = Bdb::DB_CREATE | Bdb::DB_INIT_TXN | Bdb::DB_INIT_LOCK |
                       Bdb::DB_REGISTER | Bdb::DB_RECOVER | Bdb::DB_INIT_MPOOL | Bdb::DB_THREAD
-        end
 
+          env_flags |= Bdb::DB_INIT_REP if replicate?
+        end
         @env.cachesize = config[:cache_size] if config[:cache_size]
         @env.set_timeout(config[:txn_timeout],  Bdb::DB_SET_TXN_TIMEOUT)  if config[:txn_timeout]
         @env.set_timeout(config[:lock_timeout], Bdb::DB_SET_LOCK_TIMEOUT) if config[:lock_timeout]
         @env.set_lk_max_locks(config[:max_locks]) if config[:max_locks]
         @env.set_lk_detect(Bdb::DB_LOCK_RANDOM)
         @env.flags_on = Bdb::DB_TXN_WRITE_NOSYNC | Bdb::DB_TIME_NOTGRANTED
-        @env.open(path, env_flags, 0)
+        init_replication(@env) if replicate?
 
+        @env.open(path, env_flags, 0)
+        start_replication(@env) if replicate?
         @exit_handler ||= at_exit { close }
       end
     end

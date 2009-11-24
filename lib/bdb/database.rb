@@ -10,10 +10,11 @@ class Bdb::Database < Bdb::Base
   def db(index = nil)
     if @db.nil?
       @db = {}
+      open_flags = master? ? Bdb::DB_CREATE : Bdb::DB_RDONLY
       transaction(false) do
         primary_db = environment.env.db
         primary_db.pagesize = config[:page_size] if config[:page_size]
-        primary_db.open(transaction, name, nil, Bdb::Db::BTREE, Bdb::DB_CREATE, 0)
+        primary_db.open(transaction, name, nil, Bdb::Db::BTREE, open_flags, 0)
         @db[:primary_key] = primary_db
 
         indexes.each do |field, opts|
@@ -31,13 +32,22 @@ class Bdb::Database < Bdb::Base
           index_db = environment.env.db
           index_db.flags = Bdb::DB_DUPSORT unless opts[:unique]
           index_db.pagesize = config[:page_size] if config[:page_size]
-          index_db.open(transaction, "#{name}_by_#{field}", nil, Bdb::Db::BTREE, Bdb::DB_CREATE, 0)
-          primary_db.associate(transaction, index_db, Bdb::DB_CREATE, index_callback)
+          index_db.open(transaction, "#{name}_by_#{field}", nil, Bdb::Db::BTREE, open_flags, 0)
+          primary_db.associate(transaction, index_db, open_flags, index_callback)
           @db[field] = index_db
         end
       end
     end
     @db[index || :primary_key]
+  rescue Bdb::DbError => e
+    # Retry if the database doesn't exist and we are a replication client.
+    if not master? and e.code == Errno::ENOENT::Errno
+      close
+      sleep 1
+      retry
+    else
+      raise(e)
+    end
   end
 
   def close
@@ -131,13 +141,18 @@ class Bdb::Database < Bdb::Base
     set.results
   end
 
+  def [](key)
+    get(key).first
+  end
+
   def set(key, value, opts = {})
     synchronize do
       key   = Tuple.dump(key)
       value = Marshal.dump(value)
       flags = opts[:create] ? Bdb::DB_NOOVERWRITE : 0
       db.put(transaction, key, value, flags)
-    end
+      value
+   end
   end
 
   def delete(key)
@@ -152,6 +167,10 @@ class Bdb::Database < Bdb::Base
     synchronize do
       db.truncate(transaction)
     end
+  end
+
+  def sync
+    db.sync
   end
 
 private
