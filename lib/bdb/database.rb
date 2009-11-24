@@ -58,6 +58,10 @@ class Bdb::Database < Bdb::Base
     end
   end  
 
+  def close_environment
+    environment.close
+  end
+
   def count(field, key)
     with_cursor(db(field)) do |cursor|
       k, v = cursor.get(Tuple.dump(key), nil, Bdb::DB_SET)
