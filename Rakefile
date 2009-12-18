@@ -10,7 +10,7 @@ begin
     gem.email = "code@justinbalthrop.com"
     gem.homepage = "http://github.com/ninjudd/bdb"
     gem.authors = ["Justin Balthrop"]
-    gem.files = ["README.rdoc", "VERSION", "ext/*", "lib/**/*.rb", "test/*.rb"]
+    gem.files = ["README.rdoc", "VERSION", "ext/bdb.c", "ext/bdb.h", "ext/extconf.rb", "lib/**/*.rb", "test/*.rb"]
     gem.extensions = ["ext/extconf.rb"]
     gem.require_paths = ["ext", "lib"]
   end

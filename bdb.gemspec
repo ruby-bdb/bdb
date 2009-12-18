@@ -9,7 +9,7 @@ Gem::Specification.new do |s|
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Justin Balthrop"]
-  s.date = %q{2009-11-24}
+  s.date = %q{2009-12-17}
   s.description = %q{Advanced Ruby Berkeley DB library.}
   s.email = %q{code@justinbalthrop.com}
   s.extensions = ["ext/extconf.rb"]
@@ -19,14 +19,9 @@ Gem::Specification.new do |s|
   ]
   s.files = [
     "VERSION",
-     "ext/Makefile",
-     "ext/bdb.bundle",
      "ext/bdb.c",
      "ext/bdb.h",
-     "ext/bdb.o",
-     "ext/bdb_aux._c",
      "ext/extconf.rb",
-     "ext/mkmf.log",
      "lib/bdb/base.rb",
      "lib/bdb/database.rb",
      "lib/bdb/environment.rb",
