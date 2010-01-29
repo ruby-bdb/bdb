@@ -16,7 +16,7 @@
   #undef rename
 #endif
 
-#include <version.h>
+//#include <version.h>
 #include <db.h>
 
 #define NOTXN NULL

@@ -100,7 +100,7 @@ static void db_free(t_dbh *dbh)
       	dbh->db->close(dbh->db,NOFLAGS);
       if ( RTEST(ruby_debug) && dbh->filename[0] != '\0')
     fprintf(stderr,"%s/%d %s %p %s\n",__FILE__,__LINE__,
-        "db_free database was still open!",dbh->db,dbh->filename);
+        "db_free database was still open!",(void*)dbh->db,dbh->filename);
       dbh->db=NULL;
     }
     free(dbh);
@@ -230,7 +230,7 @@ VALUE db_open(VALUE obj, VALUE vtxn, VALUE vdisk_file,
   u_int32_t flags=0;
   DBTYPE dbtype=DB_UNKNOWN;
   char *logical_db=NULL;
-  long len;
+  //long len;
   int mode=0;
 
   if ( ! NIL_P(vflags) )
@@ -498,7 +498,7 @@ VALUE db_close(VALUE obj, VALUE vflags)
   if ( dbh->db==NULL )
     return Qnil;
 
-  if (! NIL_P(dbh->adbc) && RARRAY(dbh->adbc)->len > 0 ) {
+  if (! NIL_P(dbh->adbc) && RARRAY_LEN(dbh->adbc) > 0 ) {
     rb_warning("%s/%d %s",__FILE__,__LINE__,
 	       "cursor handles still open");
     while ( (cur=rb_ary_pop(dbh->adbc)) != Qnil ) {
@@ -507,8 +507,8 @@ VALUE db_close(VALUE obj, VALUE vflags)
   }
 
   if ( RTEST(ruby_debug) )
-    rb_warning("%s/%d %s 0x%x %s",__FILE__,__LINE__,"db_close!",dbh,
-	       (dbh->filename==NULL||*(dbh->filename)=='0') ? "unknown" : dbh->filename);
+    rb_warning("%s/%d %s 0x%p %s",__FILE__,__LINE__,"db_close!", (void*)dbh,
+	       (dbh->filename==NULL||*(dbh->filename)=='0') ? (char*)"unknown" : dbh->filename);
 
   rv = dbh->db->close(dbh->db,flags);
   dbh->db=NULL;
@@ -516,7 +516,7 @@ VALUE db_close(VALUE obj, VALUE vflags)
   dbh->sproc=Qnil;
   if ( dbh->env ) {
   	if ( RTEST(ruby_debug) )
-    	rb_warning("%s/%d %s 0x%x",__FILE__,__LINE__,"db_close! removing",obj);
+    	rb_warning("%s/%d %s 0x%p",__FILE__,__LINE__,"db_close! removing",(void*)obj);
     rb_ary_delete(dbh->env->adb,obj);
     dbh->env = NULL;
   }
@@ -654,7 +654,7 @@ VALUE db_pget(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vdata, VALUE vflags)
   int rv;
   u_int32_t flags=0;
   DBT key,data,pkey;
-  VALUE str;
+  //VALUE str;
   t_txnh *txn=NULL;
 
   memset(&key,0,sizeof(DBT));
@@ -749,9 +749,9 @@ VALUE db_join(VALUE obj, VALUE vacurs, VALUE vflags)
   if (!dbh->db)
     raise(0, "db is closed");
 
-  curs = ALLOCA_N(DBC *,RARRAY(vacurs)->len);
-  for (i=0; i<RARRAY(vacurs)->len; i++) {
-    Data_Get_Struct(RARRAY(vacurs)->ptr[i],t_dbch,dbch);
+  curs = ALLOCA_N(DBC *,RARRAY_LEN(vacurs));
+  for (i=0; i<RARRAY_LEN(vacurs); i++) {
+    Data_Get_Struct(RARRAY_PTR(vacurs)[i],t_dbch,dbch);
     /* cursor is closed? */
     curs[i]=dbch->dbc;
   }
@@ -890,7 +890,7 @@ VALUE db_remove(VALUE obj, VALUE vdisk_file,
   t_dbh *dbh;
   int rv;
   u_int32_t flags=0;
-  char *logical_db=NULL;
+  //char *logical_db=NULL;
 
   if ( ! NIL_P(vflags) )
     flags=NUM2UINT(vflags);
@@ -921,8 +921,8 @@ VALUE db_rename(VALUE obj, VALUE vdisk_file,
   t_dbh *dbh;
   int rv;
   u_int32_t flags=0;
-  char *disk_file=NULL;
-  char *logical_db=NULL;
+  //char *disk_file=NULL;
+  //char *logical_db=NULL;
 
   if ( ! NIL_P(vflags) )
     flags=NUM2UINT(vflags);
@@ -978,7 +978,7 @@ VALUE db_truncate(VALUE obj, VALUE vtxn)
   t_dbh *dbh;
   t_txnh *txn=NULL;
   int rv;
-  VALUE result;
+  //VALUE result;
   u_int32_t count;
 
   if ( ! NIL_P(vtxn) ) {
@@ -1011,7 +1011,7 @@ VALUE db_key_range(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vflags)
   t_dbh *dbh;
   t_txnh *txn=NULL;
   DBT key;
-  u_int32_t flags;
+  u_int32_t flags = 0;
   int rv;
   DB_KEY_RANGE key_range;
   VALUE result;
@@ -1062,7 +1062,7 @@ VALUE db_del(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vflags)
   int rv;
   u_int32_t flags;
   DBT key;
-  VALUE str;
+  //VALUE str;
   t_txnh *txn=NULL;
 
   memset(&key,0,sizeof(DBT));
@@ -1117,12 +1117,13 @@ VALUE assoc_rescue(VALUE *error, VALUE e)
   VALUE message = StringValue(e);
   rb_warn(RSTRING_PTR(message));
   *error = e;
+	return Qnil;
 }
 
 int assoc_callback(DB *secdb, const DBT* pkey, const DBT* data, DBT* skey)
 {
   t_dbh *dbh;
-  VALUE proc;
+  //VALUE proc;
   VALUE error = Qnil;
   VALUE retv;
   VALUE args[4];
@@ -1150,20 +1151,20 @@ int assoc_callback(DB *secdb, const DBT* pkey, const DBT* data, DBT* skey)
   keys = rb_check_array_type(retv);
   if (!NIL_P(keys)) {
     keys = rb_funcall(keys,fv_uniq,0); /* secondary keys must be uniq */
-    switch(RARRAY(keys)->len) {
+    switch(RARRAY_LEN(keys)) {
     case 0:
       return DB_DONOTINDEX;
     case 1:
-      retv=RARRAY(keys)->ptr[0];
+      retv=RARRAY_PTR(keys)[0];
       break;
     default:
-      skey->size  = RARRAY(keys)->len;
+      skey->size  = RARRAY_LEN(keys);
       skey->flags = LMEMFLAG | DB_DBT_MULTIPLE | DB_DBT_APPMALLOC;
       skey->data  = malloc(skey->size * sizeof(DBT));
       memset(skey->data, 0, skey->size * sizeof(DBT));
     
       for (i=0; i<skey->size; i++) {
-        assoc_key(skey->data + i * sizeof(DBT), (VALUE)RARRAY(keys)->ptr[i]);
+        assoc_key(skey->data + i * sizeof(DBT), (VALUE)RARRAY_PTR(keys)[i]);
       }
       return 0;
     }
@@ -1190,7 +1191,7 @@ VALUE db_associate(VALUE obj, VALUE vtxn, VALUE osecdb,
   t_dbh *sdbh,*pdbh;
   int rv;
   u_int32_t flags,flagsp,flagss;
-  int fdp;
+  //int fdp;
   t_txnh *txn=NOTXN;
 
   flags=NUM2UINT(vflags);
@@ -1246,7 +1247,7 @@ bt_compare_callback2(VALUE *args)
 int bt_compare_callback(DB *db, const DBT* key1, const DBT* key2)
 {
   t_dbh *dbh;
-  VALUE proc;
+  //VALUE proc;
   int cmp;
   VALUE retv;
 
@@ -1313,7 +1314,7 @@ VALUE db_cursor(VALUE obj, VALUE vtxn, VALUE vflags)
   t_dbh *dbh;
   int rv;
   u_int32_t flags;
-  DBC *dbc;
+  //DBC *dbc;
   t_txnh *txn=NOTXN;
   VALUE c_obj;
   t_dbch *dbch;
@@ -1671,18 +1672,18 @@ VALUE env_close(VALUE obj)
   if ( eh->env==NULL )
     return Qnil;
 
-  if (RARRAY(eh->adb)->len > 0) {
-    rb_warning("%s/%d %s %d",__FILE__,__LINE__,
-	       "database handles still open",RARRAY(eh->adb)->len);
-    while (RARRAY(eh->adb)->len > 0)
+  if (RARRAY_LEN(eh->adb) > 0) {
+    rb_warning("%s/%d %s %li",__FILE__,__LINE__,
+	       "database handles still open",RARRAY_LEN(eh->adb));
+    while (RARRAY_LEN(eh->adb) > 0)
       if ((db=rb_ary_pop(eh->adb)) != Qnil ) {
-    rb_warning("%s/%d %s 0x%x",__FILE__,__LINE__,
-           "closing",db);
+    rb_warning("%s/%d %s 0x%p",__FILE__,__LINE__,
+           "closing",(void*)db);
       /* this could raise! needs rb_protect */
     db_close(db,INT2FIX(0));
       }
   }
-  if (RARRAY(eh->atxn)->len > 0) {
+  if (RARRAY_LEN(eh->atxn) > 0) {
     rb_warning("%s/%d %s",__FILE__,__LINE__,
 	       "database transactions still open");
     while ( (db=rb_ary_pop(eh->atxn)) != Qnil ) {
@@ -1692,7 +1693,7 @@ VALUE env_close(VALUE obj)
   }
 
   if ( RTEST(ruby_debug) )
-    rb_warning("%s/%d %s 0x%x",__FILE__,__LINE__,"env_close!",eh);
+    rb_warning("%s/%d %s 0x%p",__FILE__,__LINE__,"env_close!",(void*)eh);
 
   rv = eh->env->close(eh->env,NOFLAGS);
   eh->env=NULL;
@@ -1773,7 +1774,7 @@ VALUE env_set_cachesize(VALUE obj, VALUE size)
 VALUE env_get_cachesize(VALUE obj)
 {
   t_envh *eh;
-  unsigned long long ln;
+  //unsigned long long ln;
   u_int32_t bytes=0,gbytes=0;
 	int ncache;
   int rv;
@@ -2131,6 +2132,8 @@ VALUE db_stat(VALUE obj, VALUE vtxn, VALUE vflags)
     qs_int(qs_cur_recno);		/* Next available record number. */
     
     break;
+	case DB_UNKNOWN:
+		break;
   }
 
   free(su.stat);
@@ -2145,7 +2148,7 @@ VALUE db_stat(VALUE obj, VALUE vtxn, VALUE vflags)
  */
 VALUE stat_aref(VALUE obj, VALUE vname)
 {
-  rb_iv_get(obj,RSTRING_PTR(rb_str_concat(rb_str_new2("@"),vname)));
+  return rb_iv_get(obj,RSTRING_PTR(rb_str_concat(rb_str_new2("@"),vname)));
 }
 
 /*
@@ -2565,8 +2568,8 @@ VALUE env_get_lk_max_objects(VALUE obj)
 VALUE env_report_stderr(VALUE obj)
 {
   t_envh *eh;
-  u_int32_t max;
-  int rv;
+  //u_int32_t max;
+  //int rv;
 
   Data_Get_Struct(obj,t_envh,eh);
   if (!eh->env)
@@ -2953,7 +2956,7 @@ VALUE env_repmgr_stat_print(VALUE obj, VALUE flags)
 static void txn_finish(t_txnh *txn)
 {
   if ( RTEST(ruby_debug) )
-    rb_warning("%s/%d %s 0x%x",__FILE__,__LINE__,"txn_finish",txn);
+    rb_warning("%s/%d %s 0x%p",__FILE__,__LINE__,"txn_finish",(void*)txn);
 
   txn->txn=NULL;
   if (txn->env) {
