@@ -5,7 +5,7 @@
 
 Gem::Specification.new do |s|
   s.name = %q{bdb}
-  s.version = "0.2.3"
+  s.version = "0.2.2"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["Justin Balthrop", "Denis Knauf"]
@@ -46,17 +46,17 @@ Gem::Specification.new do |s|
   s.rubygems_version = %q{1.3.5}
   s.summary = %q{Ruby Berkeley DB}
   s.test_files = [
-    "test/benchmark.rb",
-     "test/cursor_test.rb",
+    "test/txn_test.rb",
      "test/database_test.rb",
-     "test/database_test_helper.rb",
-     "test/db_test.rb",
      "test/deadlock_test.rb",
-     "test/env_test.rb",
-     "test/replication_test.rb",
-     "test/stat_test.rb",
      "test/test_helper.rb",
-     "test/txn_test.rb",
+     "test/database_test_helper.rb",
+     "test/benchmark.rb",
+     "test/db_test.rb",
+     "test/env_test.rb",
+     "test/stat_test.rb",
+     "test/cursor_test.rb",
+     "test/replication_test.rb",
      "examples/replication.rb"
   ]
 
