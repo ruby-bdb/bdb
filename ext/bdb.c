@@ -42,9 +42,10 @@ static ID fv_call,fv_uniq,fv_err_new,fv_err_code,fv_err_msg;
 
 static void
 #ifdef HAVE_STDARG_PROTOTYPES
-raise_error(int code, const char *fmt, ...)
+raise_error(VALUE errClass, int code, const char *fmt, ...)
 #else
-  raise_error(code,fmt,va_alist)
+  raise_error(errClass,code,fmt,va_alist)
+		VALUE errClass;
      int code;
      const char *fmt;
      va_dcl
@@ -559,10 +560,11 @@ VALUE db_put(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vdata, VALUE vflags)
   if (!dbh->db)
     raise_error(0,"db is closed");
 
-  StringValue(vkey);
-  key.data = RSTRING_PTR(vkey);
-  key.size = RSTRING_LEN(vkey);
-  key.flags = LMEMFLAG;
+	if ( ! NIL_P(vkey) ) {
+		key.data = RSTRING_PTR(vkey);
+		key.size = RSTRING_LEN(vkey);
+		key.flags = LMEMFLAG;
+	}
 
   StringValue(vdata);
   data.data = RSTRING_PTR(vdata);
@@ -577,6 +579,14 @@ VALUE db_put(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vdata, VALUE vflags)
   if (rv != 0) {
     raise_error(rv, "db_put fails: %s",db_strerror(rv));
   }
+
+	// For example for DB_APPEND
+	if ( NIL_P(vkey) ) {
+    VALUE str = rb_str_new(data.data,data.size);
+    if (data.data) free(data.data);
+    return str;
+	}
+
   return obj;
 }
 
@@ -3119,6 +3129,7 @@ void Init_bdb() {
 
   cDb = rb_define_class_under(mBdb,"Db", rb_cObject);
   eDbError = rb_define_class_under(mBdb,"DbError",rb_eStandardError);
+	eDbErrorKeyEmpty = rb_define_class_under(mBdb,"KeyEmpty",eDbError);
   rb_define_method(eDbError,"initialize",err_initialize,2);
   rb_define_method(eDbError,"code",err_code,0);
 
