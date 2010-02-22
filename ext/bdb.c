@@ -42,10 +42,9 @@ static ID fv_call,fv_uniq,fv_err_new,fv_err_code,fv_err_msg;
 
 static void
 #ifdef HAVE_STDARG_PROTOTYPES
-raise_error(VALUE errClass, int code, const char *fmt, ...)
+raise_error(int code, const char *fmt, ...)
 #else
-  raise_error(errClass,code,fmt,va_alist)
-		VALUE errClass;
+  raise_error(code,fmt,va_alist)
      int code;
      const char *fmt;
      va_dcl
@@ -62,8 +61,20 @@ raise_error(VALUE errClass, int code, const char *fmt, ...)
 
   argv[0]=rb_str_new2(buf);
   argv[1]=INT2NUM(code);
+	VALUE cl;
+	switch( code) {
+#define eDbE_create(n) case DB_##n: cl = eDbE_##n; break;
+	eDbE_create(BUFFER_SMALL)
+	eDbE_create(LOCK_DEADLOCK)
+	eDbE_create(LOCK_NOTGRANTED)
+	eDbE_create(REP_HANDLE_DEAD)
+	eDbE_create(REP_LEASE_EXPIRED)
+	eDbE_create(REP_LOCKOUT)
+	eDbE_create(SECONDARY_BAD)
+	default: cl = eDbError
+	}
 
-  exc=rb_class_new_instance(2,argv,eDbError);
+  exc=rb_class_new_instance(2,argv,cl);
   rb_exc_raise(exc);
 }
 
@@ -3129,6 +3140,14 @@ void Init_bdb() {
 
   cDb = rb_define_class_under(mBdb,"Db", rb_cObject);
   eDbError = rb_define_class_under(mBdb,"DbError",rb_eStandardError);
+#define eDbE_cl_create(n,c) eDbE_##n = rb_define_class_under(mBdb, #c, DbError);
+	eDbE_cl_create(BUFFER_SMALL, BufferSmall)
+	eDbE_cl_create(LOCK_DEADLOCK, LockDeadlock)
+	eDbE_cl_create(LOCK_NOTGRANTED, LockNotgranted)
+	eDbE_cl_create(REP_HANDLE_DEAD, RepHandleDead)
+	eDbE_cl_create(REP_LEASE_EXPIRED, RepLeaseExpired)
+	eDbE_cl_create(REP_LOCKOUT, RepLockout)
+	eDbE_cl_create(SECONDARY_BAD, SecondaryBad)
 	eDbErrorKeyEmpty = rb_define_class_under(mBdb,"KeyEmpty",eDbError);
   rb_define_method(eDbError,"initialize",err_initialize,2);
   rb_define_method(eDbError,"code",err_code,0);
