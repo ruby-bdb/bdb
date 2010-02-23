@@ -71,6 +71,11 @@ All function arguments systematically omit the leading DB handles and TXN handle
 A few calls omit the flags parameter when the documentation indicates that no
 flag values are used - cursor.close is one.
 
+Alternative API
+---------------
+
+You can use [SBDB](http://github.com/DenisKnauf/sbdb), too.  It is easier to use, but base on this library.
+
 Notes
 =====
 
