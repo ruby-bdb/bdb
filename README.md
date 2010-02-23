@@ -84,8 +84,8 @@ flawlessly.
 The authors have put all possible caution into ensuring that DB and Ruby cooperate.
 The memory access was one aspect carefully considered. Since Ruby copies
 when doing String#new, all key/data retrieval from DB is done with a 0 flag,
-meaning that DB will be responsible. See [*"this"*](http://groups.google.com/group/comp.databases.berkeley-db/browse_frm/thread/4f70a9999b64ce6a/c06b94692e3cbc41?tvc=1&q=dbt+malloc#c06b94692e3cbc41)
- news group posting about the effect of that.
+meaning that DB will be responsible. See [*this* news group posting](http://groups.google.com/group/comp.databases.berkeley-db/browse_frm/thread/4f70a9999b64ce6a/c06b94692e3cbc41?tvc=1&q=dbt+malloc#c06b94692e3cbc41)
+about the effect of that.
 
 The only other design consideration of consequence was associate. The prior
 version used a Ruby thread local variable and kept track of the current
