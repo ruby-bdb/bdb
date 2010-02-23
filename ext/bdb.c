@@ -43,6 +43,7 @@ static ID fv_call,fv_uniq,fv_err_new,fv_err_code,fv_err_msg;
 	eDbE_create(FOREIGN_CONFLICT, ForeignConflict) \
 	eDbE_create(OLD_VERSION, OldVersion) \
 	eDbE_create(KEYEXIST, KeyExist) \
+	eDbE_create(KEYEMPTY, KeyEmpty) \
 	eDbE_create(RUNRECOVERY, RunRecovery) \
 	eDbE_create(VERSION_MISMATCH, VersionMismatch)
 
@@ -300,6 +301,36 @@ VALUE db_open(VALUE obj, VALUE vtxn, VALUE vdisk_file,
   dbh->adbc=rb_ary_new();
 	dbh->db_opened = 1;
   return obj;
+}
+
+/**
+ * call-seq:
+ *  db.set_re_len( db, re_len)
+ *
+ * Set record-length
+ */
+VALUE db_set_re_len(VALUE obj, VALUE re_len) {
+	int rv;
+	t_dbh *dbh;
+	Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise_error(0,"db isn't created");
+	rv = dbh->db->set_re_len(dbh->db,NUM2UINT(re_len));
+  if ( rv != 0 )
+    raise_error(rv, "db_set_re_len failure: %s",db_strerror(rv));
+	return re_len;
+}
+
+VALUE db_get_re_len( VALUE obj) {
+	u_int32_t re_len;
+	t_dbh *dbh;
+	Data_Get_Struct(obj,t_dbh,dbh);
+  if (!dbh->db)
+    raise_error(0,"db isn't created");
+	int rv = dbh->db->get_re_len(dbh->db,&re_len);
+  if ( rv != 0 )
+    raise_error(rv, "db_get_re_len failure: %s",db_strerror(rv));
+	return UINT2NUM(re_len);
 }
 
 /*
@@ -591,8 +622,8 @@ VALUE db_put(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vdata, VALUE vflags)
   data.size = RSTRING_LEN(vdata);
   data.flags = LMEMFLAG;
 
-	fprintf( stderr, "## key: \"%*s\" (%u) [%p], data: \"%*s\" (%u) [%p], flags: %u ##\n",
-			key.size, key.data, key.size, key, data.size, data.data, data.size, data, flags);
+	fprintf( stderr, "## key: \"%*s\" (%u), data: \"%*s\" (%u), flags: %u ##\n",
+			key.size, key.data, key.size, data.size, data.data, data.size, flags);
   rv = dbh->db->put(dbh->db,txn?txn->txn:NULL,&key,&data,flags);
   /*
   if (rv == DB_KEYEXIST)
@@ -3151,13 +3182,7 @@ void Init_bdb() {
   cDb = rb_define_class_under(mBdb,"Db", rb_cObject);
   eDbError = rb_define_class_under(mBdb,"DbError",rb_eStandardError);
 #define eDbE_create(n,c) eDbE_##c = rb_define_class_under(mBdb, #c, eDbError);
-	eDbE_create(BUFFER_SMALL, BufferSmall);
-	eDbE_create(LOCK_DEADLOCK, LockDeadlock);
-	eDbE_create(LOCK_NOTGRANTED, LockNotgranted);
-	eDbE_create(REP_HANDLE_DEAD, RepHandleDead);
-	eDbE_create(REP_LEASE_EXPIRED, RepLeaseExpired);
-	eDbE_create(REP_LOCKOUT, RepLockout);
-	eDbE_create(SECONDARY_BAD, SecondaryBad);
+EXCEPTIONS_CREATE
 
   rb_define_method(eDbError,"initialize",err_initialize,2);
   rb_define_method(eDbError,"code",err_code,0);
@@ -3178,6 +3203,8 @@ void Init_bdb() {
   rb_define_method(cDb,"cursor",db_cursor,2);
   rb_define_method(cDb,"associate",db_associate,4);
   rb_define_method(cDb,"btree_compare=",db_btree_compare_set,1);
+  rb_define_method(cDb,"re_len=",db_set_re_len,1);
+  rb_define_method(cDb,"re_len",db_get_re_len,0);
   rb_define_method(cDb,"flags=",db_flags_set,1);
   rb_define_method(cDb,"flags",db_flags_get,0);
   rb_define_method(cDb,"open",db_open,6);
