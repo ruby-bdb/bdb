@@ -1,76 +1,78 @@
-h1. Bdb
+Description
+===
 
 Ruby bindings for Berkeley DB versions 4.2-4.7.
 
-h2. Download
+Download
+========
 
 Currently this library is available via git at:
 
-<pre>
-   git://github.com/ninjudd/bdb.git
-</pre>
+	git://github.com/DenisKnauf/bdb.git
 
-h2. Installation
 
-h3. From Git
+Installation
+============
+
+From Git
+--------
 
 You can check out the latest source from git:
 
-<pre>
-   git clone git://github.com/ninjudd/bdb.git
-</pre>
+	git clone git://github.com/DenisKnauf/bdb.git
 
-h3. As a Gem
+As a Gem
+========
 
 At the moment this library is not available on Rubyforge.  To install it as a
 gem, do the following (for custom compiled version 4.8):
 
-<pre>
-   sudo env ARCHFLAGS="-arch i386" gem install bdb --source http://gemcutter.org -- --with-db-dir=/usr/local/BerkeleyDB.4.8
-</pre>
+	wget http://github.com/downloads/DenisKnauf/bdb/bdb-VERSION.gem
+	sudo env ARCHFLAGS="-arch i386" gem install bdb-VERSION.gem -- --with-db-dir=/usr/local/BerkeleyDB.4.8
 
 For Berkeley DB v4.7 installed from MacPorts do the following:
 
-<pre>
-   sudo env ARCHFLAGS="-arch i386" gem install bdb --source http://gemcutter.org -- --with-db-include=/opt/local/include/db47 --with-db-lib=/opt/local/lib/db47
-</pre>
+	sudo env ARCHFLAGS="-arch i386" gem install bdb-VERSION.gem -- --with-db-include=/opt/local/include/db47 --with-db-lib=/opt/local/lib/db47
 
 This assumes you're on OS X and BerkeleyDB wasn't compiled as a universal binary.
 
-h2. Sample Usage
+Sample Usage
+============
 
-<pre>
-  env = Bdb::Env.new(0)
-  env_flags =  Bdb::DB_CREATE |    # Create the environment if it does not already exist.
-               Bdb::DB_INIT_TXN  | # Initialize transactions
-               Bdb::DB_INIT_LOCK | # Initialize locking.
-               Bdb::DB_INIT_LOG  | # Initialize logging
-               Bdb::DB_INIT_MPOOL  # Initialize the in-memory cache.
-  env.open(File.join(File.dirname(__FILE__), 'tmp'), env_flags, 0);
-  
-  db = env.db
-  db.open(nil, 'db1.db', nil, Bdb::Db::BTREE, Bdb::DB_CREATE | Bdb::DB_AUTO_COMMIT, 0)    
 
-  txn = env.txn_begin(nil, 0)
-  db.put(txn, 'key', 'value', 0)
-  txn.commit(0)
+	env = Bdb::Env.new(0)
+	env_flags =  Bdb::DB_CREATE |    # Create the environment if it does not already exist.
+							 Bdb::DB_INIT_TXN  | # Initialize transactions
+							 Bdb::DB_INIT_LOCK | # Initialize locking.
+							 Bdb::DB_INIT_LOG  | # Initialize logging
+							 Bdb::DB_INIT_MPOOL  # Initialize the in-memory cache.
+	env.open(File.join(File.dirname(__FILE__), 'tmp'), env_flags, 0);
+	
+	db = env.db
+	db.open(nil, 'db1.db', nil, Bdb::Db::BTREE, Bdb::DB_CREATE | Bdb::DB_AUTO_COMMIT, 0)    
 
-  value = db.get(nil, 'key', nil, 0)
+	txn = env.txn_begin(nil, 0)
+	db.put(txn, 'key', 'value', 0)
+	txn.commit(0)
 
-  db.close(0)
-  env.close
-</pre>
+	value = db.get(nil, 'key', nil, 0)
 
-h2. API
+	db.close(0)
+	env.close
+
+API
+===
 
 This interface is most closely based on the DB4 C api and tries to maintain close 
-interface proximity. That API is published by Oracle at "http://www.oracle.com/technology/documentation/berkeley-db/db/api_reference/C/frame_main.html":http://www.oracle.com/technology/documentation/berkeley-db/db/api_reference/C/frame_main.html.
+interface proximity. That API is published by Oracle.
+http://www.oracle.com/technology/documentation/berkeley-db/db/api_reference/C/frame_main.html
 
 All function arguments systematically omit the leading DB handles and TXN handles.
  A few calls omit the flags parameter when the documentation indicates that no 
  flag values are used - cursor.close is one.
 
-h2. Notes
+Notes
+=====
 
 The defines generator is imperfect and includes some defines that are not
 flags. While it could be improved, it is easier to delete the incorrect ones.
@@ -82,7 +84,7 @@ flawlessly.
 The authors have put all possible caution into ensuring that DB and Ruby cooperate.
 The memory access was one aspect carefully considered. Since Ruby copies
 when doing String#new, all key/data retrieval from DB is done with a 0 flag,
-meaning that DB will be responsible. See "this":http://groups.google.com/group/comp.databases.berkeley-db/browse_frm/thread/4f70a9999b64ce6a/c06b94692e3cbc41?tvc=1&q=dbt+malloc#c06b94692e3cbc41
+meaning that DB will be responsible. See [*"this"*](http://groups.google.com/group/comp.databases.berkeley-db/browse_frm/thread/4f70a9999b64ce6a/c06b94692e3cbc41?tvc=1&q=dbt+malloc#c06b94692e3cbc41)
  news group posting about the effect of that.
 
 The only other design consideration of consequence was associate. The prior
