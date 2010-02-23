@@ -32,6 +32,23 @@ VALUE eDbError;
 
 static ID fv_call,fv_uniq,fv_err_new,fv_err_code,fv_err_msg;
 
+#define EXCEPTIONS_CREATE \
+	eDbE_create(BUFFER_SMALL, BufferSmall)\
+	eDbE_create(LOCK_DEADLOCK, LockDeadlock)\
+	eDbE_create(LOCK_NOTGRANTED, LockNotgranted)\
+	eDbE_create(REP_HANDLE_DEAD, RepHandleDead)\
+	eDbE_create(REP_LEASE_EXPIRED, RepLeaseExpired)\
+	eDbE_create(REP_LOCKOUT, RepLockout)\
+	eDbE_create(SECONDARY_BAD, SecondaryBad) \
+	eDbE_create(FOREIGN_CONFLICT, ForeignConflict) \
+	eDbE_create(OLD_VERSION, OldVersion) \
+	eDbE_create(KEYEXIST, KeyExist) \
+	eDbE_create(RUNRECOVERY, RunRecovery) \
+	eDbE_create(VERSION_MISMATCH, VersionMismatch)
+
+#define eDbE_create(n,c) VALUE eDbE_##c;
+EXCEPTIONS_CREATE
+
 /*
  * Document-class: Bdb::DbError
  *
@@ -63,15 +80,9 @@ raise_error(int code, const char *fmt, ...)
   argv[1]=INT2NUM(code);
 	VALUE cl;
 	switch( code) {
-#define eDbE_create(n) case DB_##n: cl = eDbE_##n; break;
-	eDbE_create(BUFFER_SMALL)
-	eDbE_create(LOCK_DEADLOCK)
-	eDbE_create(LOCK_NOTGRANTED)
-	eDbE_create(REP_HANDLE_DEAD)
-	eDbE_create(REP_LEASE_EXPIRED)
-	eDbE_create(REP_LOCKOUT)
-	eDbE_create(SECONDARY_BAD)
-	default: cl = eDbError
+#define eDbE_create(n,c) case DB_##n: cl = eDbE_##c; break;
+	EXCEPTIONS_CREATE
+	default: cl = eDbError; break;
 	}
 
   exc=rb_class_new_instance(2,argv,cl);
@@ -571,17 +582,17 @@ VALUE db_put(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vdata, VALUE vflags)
   if (!dbh->db)
     raise_error(0,"db is closed");
 
-	if ( ! NIL_P(vkey) ) {
-		key.data = RSTRING_PTR(vkey);
-		key.size = RSTRING_LEN(vkey);
-		key.flags = LMEMFLAG;
-	}
+	key.data = RSTRING_PTR(vkey);
+	key.size = RSTRING_LEN(vkey);
+	key.flags = LMEMFLAG;
 
   StringValue(vdata);
   data.data = RSTRING_PTR(vdata);
   data.size = RSTRING_LEN(vdata);
   data.flags = LMEMFLAG;
 
+	fprintf( stderr, "## key: \"%*s\" (%u) [%p], data: \"%*s\" (%u) [%p], flags: %u ##\n",
+			key.size, key.data, key.size, key, data.size, data.data, data.size, data, flags);
   rv = dbh->db->put(dbh->db,txn?txn->txn:NULL,&key,&data,flags);
   /*
   if (rv == DB_KEYEXIST)
@@ -591,10 +602,9 @@ VALUE db_put(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vdata, VALUE vflags)
     raise_error(rv, "db_put fails: %s",db_strerror(rv));
   }
 
-	// For example for DB_APPEND
-	if ( NIL_P(vkey) ) {
-    VALUE str = rb_str_new(data.data,data.size);
-    if (data.data) free(data.data);
+	if ( flags & DB_APPEND == DB_APPEND ) {
+    VALUE str = rb_str_new(key.data,key.size);
+    if (key.data) free(key.data);
     return str;
 	}
 
@@ -3140,15 +3150,15 @@ void Init_bdb() {
 
   cDb = rb_define_class_under(mBdb,"Db", rb_cObject);
   eDbError = rb_define_class_under(mBdb,"DbError",rb_eStandardError);
-#define eDbE_cl_create(n,c) eDbE_##n = rb_define_class_under(mBdb, #c, DbError);
-	eDbE_cl_create(BUFFER_SMALL, BufferSmall)
-	eDbE_cl_create(LOCK_DEADLOCK, LockDeadlock)
-	eDbE_cl_create(LOCK_NOTGRANTED, LockNotgranted)
-	eDbE_cl_create(REP_HANDLE_DEAD, RepHandleDead)
-	eDbE_cl_create(REP_LEASE_EXPIRED, RepLeaseExpired)
-	eDbE_cl_create(REP_LOCKOUT, RepLockout)
-	eDbE_cl_create(SECONDARY_BAD, SecondaryBad)
-	eDbErrorKeyEmpty = rb_define_class_under(mBdb,"KeyEmpty",eDbError);
+#define eDbE_create(n,c) eDbE_##c = rb_define_class_under(mBdb, #c, eDbError);
+	eDbE_create(BUFFER_SMALL, BufferSmall);
+	eDbE_create(LOCK_DEADLOCK, LockDeadlock);
+	eDbE_create(LOCK_NOTGRANTED, LockNotgranted);
+	eDbE_create(REP_HANDLE_DEAD, RepHandleDead);
+	eDbE_create(REP_LEASE_EXPIRED, RepLeaseExpired);
+	eDbE_create(REP_LOCKOUT, RepLockout);
+	eDbE_create(SECONDARY_BAD, SecondaryBad);
+
   rb_define_method(eDbError,"initialize",err_initialize,2);
   rb_define_method(eDbError,"code",err_code,0);
 
