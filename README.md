@@ -64,8 +64,8 @@ API
 ===
 
 This interface is most closely based on the DB4 C api and tries to maintain close 
-interface proximity. That API is published by Oracle.
-[http://www.oracle.com/technology/documentation/berkeley-db/db/api_reference/C/frame_main.html]
+interface proximity.
+[That API is published by Oracle](http://www.oracle.com/technology/documentation/berkeley-db/db/api_reference/C/frame_main.html).
 
 All function arguments systematically omit the leading DB handles and TXN handles.
 A few calls omit the flags parameter when the documentation indicates that no
