@@ -42,10 +42,10 @@ Sample Usage
 
 	env = Bdb::Env.new(0)
 	env_flags =  Bdb::DB_CREATE |    # Create the environment if it does not already exist.
-							 Bdb::DB_INIT_TXN  | # Initialize transactions
-							 Bdb::DB_INIT_LOCK | # Initialize locking.
-							 Bdb::DB_INIT_LOG  | # Initialize logging
-							 Bdb::DB_INIT_MPOOL  # Initialize the in-memory cache.
+	             Bdb::DB_INIT_TXN  | # Initialize transactions
+	             Bdb::DB_INIT_LOCK | # Initialize locking.
+	             Bdb::DB_INIT_LOG  | # Initialize logging
+	             Bdb::DB_INIT_MPOOL  # Initialize the in-memory cache.
 	env.open(File.join(File.dirname(__FILE__), 'tmp'), env_flags, 0);
 	
 	db = env.db
