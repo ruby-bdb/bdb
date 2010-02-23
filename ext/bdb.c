@@ -622,8 +622,6 @@ VALUE db_put(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vdata, VALUE vflags)
   data.size = RSTRING_LEN(vdata);
   data.flags = LMEMFLAG;
 
-	fprintf( stderr, "## key: \"%*s\" (%u), data: \"%*s\" (%u), flags: %u ##\n",
-			key.size, key.data, key.size, data.size, data.data, data.size, flags);
   rv = dbh->db->put(dbh->db,txn?txn->txn:NULL,&key,&data,flags);
   /*
   if (rv == DB_KEYEXIST)
