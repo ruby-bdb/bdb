@@ -317,7 +317,7 @@ VALUE db_set_re_len(VALUE obj, VALUE re_len) {
     raise_error(0,"db isn't created");
 	rv = dbh->db->set_re_len(dbh->db,NUM2UINT(re_len));
   if ( rv != 0 )
-    raise_error(rv, "db_set_re_len failure: %s",db_strerror(rv));
+    raise_error(rv, "set_re_len failure: %s",db_strerror(rv));
 	return re_len;
 }
 
@@ -2481,6 +2481,33 @@ VALUE env_get_shm_key(VALUE obj)
   return INT2FIX(key);
 }
 
+VALUE env_log_set_config_h(VALUE obj, u_int32_t flags, VALUE onoff) {
+	t_envh *eh;
+	int rv;
+	Data_Get_Struct(obj,t_envh, eh);
+	rv=eh->env->log_set_config(eh->env, flags, Qnil != flags && Qfalse != onoff);
+	if(rv != 0)
+		raise_error(rv, "log_set_config: %s", db_strerror(rv));
+	return flags;
+}
+
+#define ENV_LOG_SET_CONFIG_FUNCS \
+	ENV_LOG_SET_CONFIG_FUNC(direct,DIRECT) \
+	ENV_LOG_SET_CONFIG_FUNC(dsync,DSYNC) \
+	ENV_LOG_SET_CONFIG_FUNC(auto_remove,AUTO_REMOVE) \
+	ENV_LOG_SET_CONFIG_FUNC(in_memory,IN_MEMORY) \
+	ENV_LOG_SET_CONFIG_FUNC(zero,ZERO)
+
+#define ENV_LOG_SET_CONFIG_FUNC( name, cnst) \
+	VALUE env_log_##cnst( VALUE obj, VALUE flags) { \
+		return env_log_set_config_h( obj, DB_LOG_##cnst, flags); \
+	}
+ENV_LOG_SET_CONFIG_FUNCS
+
+VALUE env_log_set_config( VALUE obj, VALUE flags, VALUE onoff) {
+	return env_log_set_config_h( obj, NUM2UINT(flags), onoff);
+}
+
 /*
  * call-seq:
  * env.set_lk_detect(detect) -> detect
@@ -3254,29 +3281,33 @@ EXCEPTIONS_CREATE
   rb_define_method(cEnv,"txn_begin",env_txn_begin,2);
   rb_define_method(cEnv,"txn_checkpoint",env_txn_checkpoint,3);
   rb_define_method(cEnv,"txn_stat",env_txn_stat,1);
-  rb_define_method(cEnv,"set_timeout",env_set_timeout,2);
-  rb_define_method(cEnv,"get_timeout",env_get_timeout,1);
-  rb_define_method(cEnv,"set_tx_max",env_set_tx_max,1);
+	rb_define_method(cEnv,"timeout",env_set_timeout,2);
+	rb_define_method(cEnv,"timeout",env_get_timeout,1);
   rb_define_method(cEnv,"mutex_get_max",env_mutex_get_max,0);
   rb_define_method(cEnv,"mutex_set_max",env_mutex_set_max,1);
-  rb_define_method(cEnv,"get_tx_max",env_get_tx_max,0);
+  rb_define_method(cEnv,"tx_max=",env_set_tx_max,1);
+  rb_define_method(cEnv,"tx_max",env_get_tx_max,0);
   rb_define_method(cEnv,"report_stderr",env_report_stderr,0);
-  rb_define_method(cEnv,"set_lk_detect",env_set_lk_detect,1);
-  rb_define_method(cEnv,"get_lk_detect",env_get_lk_detect,0);
-  rb_define_method(cEnv,"set_lk_max_locks",env_set_lk_max_locks,1);
-  rb_define_method(cEnv,"get_lk_max_locks",env_get_lk_max_locks,0);
-  rb_define_method(cEnv,"set_lk_max_objects",env_set_lk_max_objects,1);
-  rb_define_method(cEnv,"get_lk_max_objects",env_get_lk_max_objects,0);
-  rb_define_method(cEnv,"set_shm_key",env_set_shm_key,1);
-  rb_define_method(cEnv,"get_shm_key",env_get_shm_key,0);
+  rb_define_method(cEnv,"lk_detect=",env_set_lk_detect,1);
+  rb_define_method(cEnv,"lk_detect",env_get_lk_detect,0);
+  rb_define_method(cEnv,"lk_max_locks=",env_set_lk_max_locks,1);
+  rb_define_method(cEnv,"lk_max_locks",env_get_lk_max_locks,0);
+  rb_define_method(cEnv,"lk_max_objects=",env_set_lk_max_objects,1);
+  rb_define_method(cEnv,"lk_max_objects",env_get_lk_max_objects,0);
+  rb_define_method(cEnv,"shm_key=",env_set_shm_key,1);
+  rb_define_method(cEnv,"shm_key",env_get_shm_key,0);
+	rb_define_method(cEnv,"log_set_config",env_log_set_config,2);
+#define ENV_LOG_SET_CONFIG_FUNC(name,cnst) \
+	rb_define_method(cEnv,"log_"#name,env_log_##cnst,1);
+	ENV_LOG_SET_CONFIG_FUNCS
 
-  rb_define_method(cEnv,"set_data_dir",env_set_data_dir,1);
-  rb_define_method(cEnv,"get_data_dirs",env_get_data_dirs,0);
-  rb_define_method(cEnv,"set_lg_dir",env_set_lg_dir,1);
-  rb_define_method(cEnv,"get_lg_dir",env_get_lg_dir,0);
-  rb_define_method(cEnv,"set_tmp_dir",env_set_tmp_dir,1);
-  rb_define_method(cEnv,"get_tmp_dir",env_get_tmp_dir,0);
-  rb_define_method(cEnv,"get_home",env_get_home,0);
+  rb_define_method(cEnv,"data_dir=",env_set_data_dir,1);
+  rb_define_method(cEnv,"data_dirs",env_get_data_dirs,0);
+	rb_define_method(cEnv,"lg_dir=",env_set_lg_dir,1);
+  rb_define_method(cEnv,"lg_dir",env_get_lg_dir,0);
+  rb_define_method(cEnv,"tmp_dir=",env_set_tmp_dir,1);
+  rb_define_method(cEnv,"tmp_dir",env_get_tmp_dir,0);
+  rb_define_method(cEnv,"home",env_get_home,0);
   rb_define_method(cEnv,"set_verbose",env_set_verbose,2);
 
   rb_define_method(cEnv,"rep_priority=", env_rep_set_priority, 1);
