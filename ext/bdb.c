@@ -2491,18 +2491,31 @@ VALUE env_log_set_config_h(VALUE obj, u_int32_t flags, VALUE onoff) {
 	return flags;
 }
 
-#define ENV_LOG_SET_CONFIG_FUNCS \
-	ENV_LOG_SET_CONFIG_FUNC(direct,DIRECT) \
-	ENV_LOG_SET_CONFIG_FUNC(dsync,DSYNC) \
-	ENV_LOG_SET_CONFIG_FUNC(auto_remove,AUTO_REMOVE) \
-	ENV_LOG_SET_CONFIG_FUNC(in_memory,IN_MEMORY) \
-	ENV_LOG_SET_CONFIG_FUNC(zero,ZERO)
+VALUE env_log_get_config_h( VALUE obj, u_int32_t flags) {
+	t_envh *eh;
+	int rv, onoff;
+	Data_Get_Struct(obj,t_envh, eh);
+	rv=eh->env->log_get_config(eh->env, flags, &onoff);
+	if(rv != 0)
+		raise_error(rv, "log_set_config: %s", db_strerror(rv));
+	return onoff ? Qtrue : Qfalse;
+}
 
-#define ENV_LOG_SET_CONFIG_FUNC( name, cnst) \
-	VALUE env_log_##cnst( VALUE obj, VALUE flags) { \
+#define ENV_LOG_CONFIG_FUNCS \
+	ENV_LOG_CONFIG_FUNC(direct,DIRECT) \
+	ENV_LOG_CONFIG_FUNC(dsync,DSYNC) \
+	ENV_LOG_CONFIG_FUNC(auto_remove,AUTO_REMOVE) \
+	ENV_LOG_CONFIG_FUNC(in_memory,IN_MEMORY) \
+	ENV_LOG_CONFIG_FUNC(zero,ZERO)
+
+#define ENV_LOG_CONFIG_FUNC( name, cnst) \
+	VALUE env_log_set_##cnst( VALUE obj, VALUE flags) { \
 		return env_log_set_config_h( obj, DB_LOG_##cnst, flags); \
+	} \
+	VALUE env_log_get_##cnst( VALUE obj, VALUE flags) { \
+		return env_log_get_config_h( obj, DB_LOG_##cnst); \
 	}
-ENV_LOG_SET_CONFIG_FUNCS
+ENV_LOG_CONFIG_FUNCS
 
 VALUE env_log_set_config( VALUE obj, VALUE flags, VALUE onoff) {
 	return env_log_set_config_h( obj, NUM2UINT(flags), onoff);
@@ -3296,10 +3309,11 @@ EXCEPTIONS_CREATE
   rb_define_method(cEnv,"lk_max_objects",env_get_lk_max_objects,0);
   rb_define_method(cEnv,"shm_key=",env_set_shm_key,1);
   rb_define_method(cEnv,"shm_key",env_get_shm_key,0);
-	rb_define_method(cEnv,"log_set_config",env_log_set_config,2);
-#define ENV_LOG_SET_CONFIG_FUNC(name,cnst) \
-	rb_define_method(cEnv,"log_"#name,env_log_##cnst,1);
-	ENV_LOG_SET_CONFIG_FUNCS
+	rb_define_method(cEnv,"log_config",env_log_set_config,2);
+#define ENV_LOG_CONFIG_FUNC(name,cnst) \
+	rb_define_method(cEnv,"log_"#name "=",env_log_set_##cnst,1); \
+	rb_define_method(cEnv,"log_"#name,env_log_get_##cnst,0);
+	ENV_LOG_CONFIG_FUNCS
 
   rb_define_method(cEnv,"data_dir=",env_set_data_dir,1);
   rb_define_method(cEnv,"data_dirs",env_get_data_dirs,0);
