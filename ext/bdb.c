@@ -3052,6 +3052,26 @@ VALUE env_repmgr_stat_print(VALUE obj, VALUE flags)
   return Qtrue;
 }
 
+VALUE env_set_lg_bsize( VALUE obj, VALUE size) {
+	t_envh *eh;
+	int rv;
+	Data_Get_Struct(obj, t_envh, eh);
+	rv = eh->env->set_lg_bsize( eh->env, NUM2UINT( size));
+  if ( rv != 0 )
+		raise_error(rv, "env_set_lg_bsize: %s", db_strerror(rv));
+  return size;
+}
+
+VALUE env_get_lg_bsize( VALUE obj) {
+	t_envh *eh;
+	int rv, size;
+	Data_Get_Struct( obj, t_envh, eh);
+	rv = eh->env->get_lg_bsize( eh->env, &size);
+  if ( rv != 0 )
+		raise_error(rv, "env_get_lg_bsize: %s", db_strerror(rv));
+  return INT2FIX(size);
+}
+
 
 static void txn_finish(t_txnh *txn)
 {
@@ -3334,6 +3354,9 @@ EXCEPTIONS_CREATE
   rb_define_method(cEnv,"repmgr_ack_policy", env_repmgr_get_ack_policy, 0);
   rb_define_method(cEnv,"repmgr_start", env_repmgr_start, 2);
   rb_define_method(cEnv,"repmgr_stat_print", env_repmgr_stat_print, 1);
+
+	rb_define_method(cEnv,"lg_bsize=", env_set_lg_bsize, 1);
+	rb_define_method(cEnv,"lg_bsize", env_get_lg_bsize, 1);
 
   cTxnStat = rb_define_class_under(mBdb,"TxnStat",rb_cObject);
   rb_define_method(cTxnStat,"[]",stat_aref,1);
