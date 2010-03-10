@@ -1,3 +1,4 @@
 logs
 *.gem
 .gitignore
+pkg
