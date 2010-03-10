@@ -3064,12 +3064,55 @@ VALUE env_set_lg_bsize( VALUE obj, VALUE size) {
 
 VALUE env_get_lg_bsize( VALUE obj) {
 	t_envh *eh;
-	int rv, size;
+	int rv;
+	u_int32_t size;
 	Data_Get_Struct( obj, t_envh, eh);
 	rv = eh->env->get_lg_bsize( eh->env, &size);
   if ( rv != 0 )
 		raise_error(rv, "env_get_lg_bsize: %s", db_strerror(rv));
-  return INT2FIX(size);
+  return UINT2FIX(size);
+}
+
+VALUE env_set_lg_max( VALUE obj, VALUE size) {
+	t_envh *eh;
+	int rv;
+	Data_Get_Struct(obj, t_envh, eh);
+	rv = eh->env->set_lg_max( eh->env, NUM2UINT( size));
+  if ( rv != 0 )
+		raise_error(rv, "env_set_lg_max: %s", db_strerror(rv));
+  return size;
+}
+
+VALUE env_get_lg_max( VALUE obj) {
+	t_envh *eh;
+	int rv;
+	u_int32_t size;
+	Data_Get_Struct( obj, t_envh, eh);
+	rv = eh->env->get_lg_max( eh->env, &size);
+  if ( rv != 0 )
+		raise_error(rv, "env_get_lg_max: %s", db_strerror(rv));
+  return UINT2FIX(size);
+}
+
+VALUE env_set_lg_regionmax( VALUE obj, VALUE size) {
+	t_envh *eh;
+	int rv;
+	Data_Get_Struct(obj, t_envh, eh);
+	rv = eh->env->set_lg_regionmax( eh->env, NUM2UINT( size));
+  if ( rv != 0 )
+		raise_error(rv, "env_set_lg_regionmax: %s", db_strerror(rv));
+  return size;
+}
+
+VALUE env_get_lg_regionmax( VALUE obj) {
+	t_envh *eh;
+	int rv;
+	u_int32_t size;
+	Data_Get_Struct( obj, t_envh, eh);
+	rv = eh->env->get_lg_regionmax( eh->env, &size);
+  if ( rv != 0 )
+		raise_error(rv, "env_get_lg_regionmax: %s", db_strerror(rv));
+  return UINT2FIX(size);
 }
 
 
@@ -3356,7 +3399,11 @@ EXCEPTIONS_CREATE
   rb_define_method(cEnv,"repmgr_stat_print", env_repmgr_stat_print, 1);
 
 	rb_define_method(cEnv,"lg_bsize=", env_set_lg_bsize, 1);
-	rb_define_method(cEnv,"lg_bsize", env_get_lg_bsize, 1);
+	rb_define_method(cEnv,"lg_bsize", env_get_lg_bsize, 0);
+	rb_define_method(cEnv,"lg_max=", env_set_lg_max, 1);
+	rb_define_method(cEnv,"lg_max", env_get_lg_max, 0);
+	rb_define_method(cEnv,"lg_regionmax=", env_set_lg_regionmax, 1);
+	rb_define_method(cEnv,"lg_regionmax", env_get_lg_regionmax, 0);
 
   cTxnStat = rb_define_class_under(mBdb,"TxnStat",rb_cObject);
   rb_define_method(cTxnStat,"[]",stat_aref,1);
