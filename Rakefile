@@ -8,7 +8,7 @@ begin
     gem.summary = %Q{Ruby Berkeley DB}
     gem.description = %Q{Advanced Ruby Berkeley DB library.}
     gem.email = %w[code@justinbalthrop.com Denis.Knauf@gmail.com]
-    gem.homepage = "http://github.com/denis.knauf/bdb"
+    gem.homepage = "http://github.com/DenisKnauf/bdb"
     gem.authors = ["Justin Balthrop", "Denis Knauf"]
     gem.files = ["README.md", "VERSION", "ext/*.c", "ext/*.h", "lib/**/*.rb", "test/*.rb"]
     gem.extensions = ["ext/extconf.rb"]
