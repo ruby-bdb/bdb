@@ -10,9 +10,9 @@ begin
     gem.email = %w[code@justinbalthrop.com Denis.Knauf@gmail.com]
     gem.homepage = "http://github.com/DenisKnauf/bdb"
     gem.authors = ["Justin Balthrop", "Denis Knauf"]
-    gem.files = ["README.md", "VERSION", "ext/*.c", "ext/*.h", "lib/**/*.rb", "test/*.rb"]
-    gem.extensions = ["ext/extconf.rb"]
-    gem.require_paths = ["ext", "lib"]
+    gem.files = %w[AUTHORS README.md VERSION ext/*.c ext/*.h lib/**/*.rb test/*.rb]
+    gem.extensions = %w[ext/extconf.rb]
+    gem.require_paths = %w[ext lib]
   end
   Jeweler::GemcutterTasks.new
 rescue LoadError
