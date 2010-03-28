@@ -1,15 +1,7 @@
 Description
 ===
 
-Ruby bindings for Berkeley DB versions 4.2-4.7.
-
-Download
-========
-
-Currently this library is available via git at:
-
-	git://github.com/DenisKnauf/bdb.git
-
+Ruby bindings for Berkeley DB versions 4.2-4.8.
 
 Installation
 ============
@@ -25,20 +17,18 @@ As a Gem
 ========
 
 At the moment this library is not available on Rubyforge.  To install it as a
-gem, do the following (for custom compiled version 4.8):
+gem, do the following:
 
-	wget http://github.com/downloads/DenisKnauf/bdb/bdb-VERSION.gem
-	sudo env ARCHFLAGS="-arch i386" gem install bdb-VERSION.gem -- --with-db-dir=/usr/local/BerkeleyDB.4.8
+	sudo gem install dk-bdb
 
 For Berkeley DB v4.7 installed from MacPorts do the following:
 
-	sudo env ARCHFLAGS="-arch i386" gem install bdb-VERSION.gem -- --with-db-include=/opt/local/include/db47 --with-db-lib=/opt/local/lib/db47
+	sudo env ARCHFLAGS="-arch i386" gem install dk-bdb
 
 This assumes you're on OS X and BerkeleyDB wasn't compiled as a universal binary.
 
 Sample Usage
 ============
-
 
 	env = Bdb::Env.new(0)
 	env_flags =  Bdb::DB_CREATE |    # Create the environment if it does not already exist.
