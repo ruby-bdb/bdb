@@ -1,11 +1,14 @@
 #!/usr/bin/env ruby
 require 'mkmf'
-default_dir = '/usr/local/BerkeleyDB.4.8'
-inc, lib = dir_config('db', "#{default_dir}/include", "#{default_dir}/lib")
 
-versions=%w(db-4.8 db-4.7 db-4.6 db-4.5 db-4.4 db-4.3 db-4.2)
-until versions.empty?
-  (lib_ok = have_library(versions.shift, 'db_version', 'db.h')) && break
+%w[/usr/local /usr / /usr/local/db* /usr/local/BerkeleyDB*].each do |pdir|
+	Dir[pdir].each do |dir|
+		dir_config('db', "#{dir}/include", "#{dir}/lib")
+	end
+end
+
+%w(db-4.9 db-4.8 db-4.7 db-4.6 db-4.5 db-4.4 db-4.3 db-4.2).each do |ver|
+	have_library ver, 'db_version', 'db.h'
 end
 
 def create_header
@@ -19,7 +22,7 @@ def create_header
     f = File.join(e[2..-1], 'db.h')
     File.exists?(f) ? f : nil
   }.select { |e| e }.first
-  
+
   n=0
   defines=[]
   File.open(db_header) {|fd|
@@ -50,10 +53,10 @@ def create_header
   }
 end
 
-if lib_ok
+#if lib_ok
   create_header
   create_makefile('bdb')
-else
-  $stderr.puts("cannot create Makefile")
-  exit 1
-end
+#else
+#  $stderr.puts("cannot create Makefile")
+#  exit 1
+#end
