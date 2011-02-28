@@ -47,11 +47,17 @@ def create_header
   end
   
   message("Writing bdb_aux._c (defines), this takes a while\n")
-  db_header = $CPPFLAGS.split.select { |f| f =~ /^-I/ }.map { |e| 
-    f = File.join(e[2..-1], 'db.h')
+
+  search_include = ($CPPFLAGS).split.select { |f| f =~ /^-I/ }.map { |f| f.sub(/^-I\s*/, '') } 
+  search_include += ["/usr/include", "/usr/local/include"]
+
+  db_header = search_include.map { |e| 
+    f = File.join(e, 'db.h')
     File.exists?(f) ? f : nil
-  }.select { |e| e }.first
-  
+  }.compact.first
+
+  raise "Could not find db.h! (searched #{search_include.join(':')})" unless db_header 
+ 
   n=0
   defines=[]
   File.open(db_header) {|fd|
