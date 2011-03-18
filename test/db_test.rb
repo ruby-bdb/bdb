@@ -31,7 +31,7 @@ class DbTest < Test::Unit::TestCase
   def test_flags_set_and_get
     @db1 = Bdb::Db.new
     @db1.flags = Bdb::DB_DUPSORT
-    assert Bdb::DB_DUPSORT, @db1.flags
+    assert_equal Bdb::DB_DUPSORT | Bdb::DB_DUP, @db1.flags # setting up Bdb::DB_DUPSORT explicitly set Bdb::DB_DUP
   end
     
   def test_associate_and_pget

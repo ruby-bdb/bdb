@@ -325,7 +325,7 @@ VALUE db_flags_get(VALUE obj)
   if ( rv != 0 ) {
     raise_error(rv, "db_flag_get failure: %s",db_strerror(rv));
   }
-  return INT2NUM(flags);
+  return UINT2NUM(flags);
 }
 
 /*
@@ -496,7 +496,7 @@ VALUE db_close(VALUE obj, VALUE vflags)
   if ( dbh->db==NULL )
     return Qnil;
 
-  if (! NIL_P(dbh->adbc) && RARRAY(dbh->adbc)->len > 0 ) {
+  if (! NIL_P(dbh->adbc) && RARRAY_LEN(dbh->adbc) > 0 ) {
     rb_warning("%s/%d %s",__FILE__,__LINE__,
 	       "cursor handles still open");
     while ( (cur=rb_ary_pop(dbh->adbc)) != Qnil ) {
@@ -744,9 +744,9 @@ VALUE db_join(VALUE obj, VALUE vacurs, VALUE vflags)
   if (!dbh->db)
     raise(0, "db is closed");
 
-  curs = ALLOCA_N(DBC *,RARRAY(vacurs)->len);
-  for (i=0; i<RARRAY(vacurs)->len; i++) {
-    Data_Get_Struct(RARRAY(vacurs)->ptr[i],t_dbch,dbch);
+  curs = ALLOCA_N(DBC *,RARRAY_LEN(vacurs));
+  for (i=0; i<RARRAY_LEN(vacurs); i++) {
+    Data_Get_Struct(RARRAY_PTR(vacurs)[i],t_dbch,dbch);
     /* cursor is closed? */
     curs[i]=dbch->dbc;
   }
@@ -1575,10 +1575,10 @@ VALUE env_close(VALUE obj)
   if ( eh->env==NULL )
     return Qnil;
 
-  if (RARRAY(eh->adb)->len > 0) {
+  if (RARRAY_LEN(eh->adb) > 0) {
     rb_warning("%s/%d %s %d",__FILE__,__LINE__,
-	       "database handles still open",RARRAY(eh->adb)->len);
-    while (RARRAY(eh->adb)->len > 0)
+	       "database handles still open",RARRAY_LEN(eh->adb));
+    while (RARRAY_LEN(eh->adb) > 0)
       if ((db=rb_ary_pop(eh->adb)) != Qnil ) {
     rb_warning("%s/%d %s 0x%x",__FILE__,__LINE__,
            "closing",db);
@@ -1586,7 +1586,7 @@ VALUE env_close(VALUE obj)
     db_close(db,INT2FIX(0));
       }
   }
-  if (RARRAY(eh->atxn)->len > 0) {
+  if (RARRAY_LEN(eh->atxn) > 0) {
     rb_warning("%s/%d %s",__FILE__,__LINE__,
 	       "database transactions still open");
     while ( (db=rb_ary_pop(eh->atxn)) != Qnil ) {

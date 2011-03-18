@@ -4,6 +4,22 @@
 
 #include <ruby.h>
 
+#ifndef RUBY_19
+#ifndef RARRAY_LEN
+#define RARRAY_LEN(x) (RARRAY(x)->len)
+#endif
+#ifndef RSTRING_PTR
+#define RSTRING_PTR(x) (RSTRING(x)->ptr)
+#endif
+#ifndef RFLOAT_VALUE
+#define RFLOAT_VALUE(v) (RFLOAT(v)->value)
+#endif
+#ifndef RARRAY_PTR
+#define RARRAY_PTR(v) (RARRAY(v)->ptr)
+#endif
+#endif
+
+
 #ifdef stat
   #undef stat
 #endif
@@ -16,7 +32,6 @@
   #undef rename
 #endif
 
-#include <version.h>
 #include <db.h>
 
 #define NOTXN NULL
