@@ -1,13 +1,15 @@
 #!/usr/bin/env ruby
 require 'mkmf'
 
-%w[/usr/local /usr / /usr/local/db* /usr/local/BerkeleyDB*].each do |pdir|
+# This list is checked in reverse order, so this order allows mkmf on my Mac
+# to find BDB installed via Homebrew (/usr/local) before system installs
+%w[/usr / /usr/local /usr/local/db* /usr/local/BerkeleyDB*].each do |pdir|
 	Dir[pdir].each do |dir|
 		dir_config('db', "#{dir}/include", "#{dir}/lib")
 	end
 end
 
-%w(db-4.9 db-4.8 db-4.7 db-4.6 db-4.5 db-4.4 db-4.3 db-4.2).each do |ver|
+%w(db-5.1 db-5.0 db-4.9 db-4.8 db-4.7 db-4.6 db-4.5 db-4.4 db-4.3 db-4.2).each do |ver|
 	have_library ver, 'db_version', 'db.h'
 end
 
@@ -18,6 +20,7 @@ def create_header
   end
   
   message("Writing bdb_aux._c (defines), this takes a while\n")
+
   db_header = $CPPFLAGS.split.select { |f| f =~ /^-I/ }.map { |e| 
     f = File.join(e[2..-1], 'db.h')
     File.exists?(f) ? f : nil

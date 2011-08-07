@@ -827,7 +827,7 @@ VALUE db_join(VALUE obj, VALUE vacurs, VALUE vflags)
   return jcurs;
 }
 
-#if DB_VERSION_MINOR > 3
+#if DB_VERSION_MAJOR == 5 || DB_VERSION_MINOR > 3
 /*
  * call-seq:
  *	db.compact(txn,start_key,stop_key,compact_opts,flags) -> end_key
@@ -2105,7 +2105,7 @@ VALUE db_stat(VALUE obj, VALUE vtxn, VALUE vflags)
   rv=dbh->db->get_type(dbh->db,&dbtype);
   if (rv)
     raise_error(rv,"db_stat %s",db_strerror(rv));
-#if DB_VERSION_MINOR > 2
+#if DB_VERSION_MAJOR == 5 || DB_VERSION_MINOR > 2
   rv=dbh->db->stat(dbh->db,txn?txn->txn:NULL,&(su.stat),flags);
 #else
   rv=dbh->db->stat(dbh->db,&(su.stat),flags);
@@ -2151,7 +2151,7 @@ VALUE db_stat(VALUE obj, VALUE vtxn, VALUE vflags)
     bs_int(bt_nkeys);		/* Number of unique keys. */
     bs_int(bt_ndata);		/* Number of data items. */
     bs_int(bt_pagesize);		/* Page size. */
-#if DB_VERSION_MINOR < 4
+#if DB_VERSION_MAJOR == 4 && DB_VERSION_MINOR < 4
     bs_int(bt_maxkey);		/* Maxkey value. */
 #endif
     bs_int(bt_minkey);		/* Minkey value. */
@@ -2162,7 +2162,7 @@ VALUE db_stat(VALUE obj, VALUE vtxn, VALUE vflags)
     bs_int(bt_leaf_pg);		/* Leaf pages. */
     bs_int(bt_dup_pg);		/* Duplicate pages. */
     bs_int(bt_over_pg);		/* Overflow pages. */
-#if DB_VERSION_MINOR > 2
+#if DB_VERSION_MAJOR == 5 || DB_VERSION_MINOR > 2
     bs_int(bt_empty_pg);		/* Empty pages. */
 #endif
     bs_int(bt_free);		/* Pages on the free list. */
@@ -3331,7 +3331,7 @@ EXCEPTIONS_CREATE
   rb_define_method(cDb,"sync",db_sync,0);
   rb_define_method(cDb,"truncate",db_truncate,1);
 
-#if DB_VERSION_MINOR > 3
+#if DB_VERSION_MAJOR == 5 || DB_VERSION_MINOR > 3
   rb_define_method(cDb,"compact",db_compact,5);
 #endif
 
