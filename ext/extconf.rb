@@ -20,6 +20,7 @@ def create_header
   end
   
   message("Writing bdb_aux._c (defines), this takes a while\n")
+
   db_header = $CPPFLAGS.split.select { |f| f =~ /^-I/ }.map { |e| 
     f = File.join(e[2..-1], 'db.h')
     File.exists?(f) ? f : nil
