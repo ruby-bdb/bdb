@@ -1,7 +1,9 @@
 #!/usr/bin/env ruby
 require 'mkmf'
 
-%w[/usr/local /usr / /usr/local/db* /usr/local/BerkeleyDB*].each do |pdir|
+# This list is checked in reverse order, so this order allows mkmf on my Mac
+# to find BDB installed via Homebrew (/usr/local) before system installs
+%w[/usr / /usr/local /usr/local/db* /usr/local/BerkeleyDB*].each do |pdir|
 	Dir[pdir].each do |dir|
 		dir_config('db', "#{dir}/include", "#{dir}/lib")
 	end
