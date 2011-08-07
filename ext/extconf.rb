@@ -7,7 +7,7 @@ require 'mkmf'
 	end
 end
 
-%w(db-4.9 db-4.8 db-4.7 db-4.6 db-4.5 db-4.4 db-4.3 db-4.2).each do |ver|
+%w(db-5.1 db-5.0 db-4.9 db-4.8 db-4.7 db-4.6 db-4.5 db-4.4 db-4.3 db-4.2).each do |ver|
 	have_library ver, 'db_version', 'db.h'
 end
 
