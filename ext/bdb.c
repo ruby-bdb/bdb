@@ -2875,6 +2875,30 @@ VALUE env_set_verbose(VALUE obj, VALUE which, VALUE onoff)
 
 /*
  * call-seq:
+ * env.set_encrypt(passwd) 
+ *
+ * set encrypt
+ */
+VALUE env_set_encrypt(VALUE obj, VALUE vpasswd)
+{
+  t_envh *eh;
+  const char *passwd;
+  int rv;
+
+  passwd = StringValueCStr(vpasswd);
+  Data_Get_Struct(obj, t_envh, eh);
+  u_int32_t flags=0x00000001; //DB_ENCRYPT_AES
+  
+  rv = eh->env->set_encrypt(eh->env, passwd, flags);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_set_encrypt: %s",db_strerror(rv));
+  }
+
+  return vpasswd;
+}
+
+/*
+ * call-seq:
  * env.rep_priority = int
  *
  * specify how the replication manager will handle acknowledgement of replication messages
@@ -3386,6 +3410,9 @@ EXCEPTIONS_CREATE
   rb_define_method(cEnv,"tmp_dir",env_get_tmp_dir,0);
   rb_define_method(cEnv,"home",env_get_home,0);
   rb_define_method(cEnv,"set_verbose",env_set_verbose,2);
+
+  rb_define_method(cEnv,"encrypt=",env_set_encrypt,1);
+  //rb_define_method(cEnv,"encrypt",env_get_encrypt,0);
 
   rb_define_method(cEnv,"rep_priority=", env_rep_set_priority, 1);
   rb_define_method(cEnv,"rep_priority", env_rep_get_priority, 0);
