@@ -1058,6 +1058,28 @@ VALUE db_truncate(VALUE obj, VALUE vtxn)
   return INT2FIX(count);
 }
 
+/**
+ * call-seq:
+ *  db.set_encrypt(db, passwd)
+ *
+ * Set encrypt
+ */
+VALUE db_set_encrypt(VALUE obj, VALUE vpasswd) {
+    int rv;
+    t_dbh *dbh;
+    const char *passwd;
+ 
+    passwd = StringValueCStr(vpasswd);
+    Data_Get_Struct(obj,t_dbh,dbh);
+    u_int32_t flags=0x00000001; //DB_ENCRYPT_AES
+       
+    rv = dbh->db->set_encrypt(dbh->db, passwd, flags);
+    
+    if ( rv != 0 )
+        raise_error(rv, "set_encrypt failure: %s",db_strerror(rv));
+       return vpasswd;
+}
+
 /*
  * call-seq:
  * db.key_range(txn,vkey,flags) -> [#less,#same,#greater]
@@ -3354,6 +3376,8 @@ EXCEPTIONS_CREATE
 
   rb_define_method(cDb,"sync",db_sync,0);
   rb_define_method(cDb,"truncate",db_truncate,1);
+
+  rb_define_method(cDb,"encrypt=",db_set_encrypt,1);
 
 #if DB_VERSION_MAJOR == 5 || DB_VERSION_MINOR > 3
   rb_define_method(cDb,"compact",db_compact,5);
