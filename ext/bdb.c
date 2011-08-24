@@ -1058,6 +1058,28 @@ VALUE db_truncate(VALUE obj, VALUE vtxn)
   return INT2FIX(count);
 }
 
+/**
+ * call-seq:
+ *  db.set_encrypt(db, passwd)
+ *
+ * Set encrypt
+ */
+VALUE db_set_encrypt(VALUE obj, VALUE vpasswd) {
+    int rv;
+    t_dbh *dbh;
+    const char *passwd;
+ 
+    passwd = StringValueCStr(vpasswd);
+    Data_Get_Struct(obj,t_dbh,dbh);
+    u_int32_t flags=0x00000001; //DB_ENCRYPT_AES
+       
+    rv = dbh->db->set_encrypt(dbh->db, passwd, flags);
+    
+    if ( rv != 0 )
+        raise_error(rv, "set_encrypt failure: %s",db_strerror(rv));
+       return vpasswd;
+}
+
 /*
  * call-seq:
  * db.key_range(txn,vkey,flags) -> [#less,#same,#greater]
@@ -2875,6 +2897,30 @@ VALUE env_set_verbose(VALUE obj, VALUE which, VALUE onoff)
 
 /*
  * call-seq:
+ * env.set_encrypt(passwd) 
+ *
+ * set encrypt
+ */
+VALUE env_set_encrypt(VALUE obj, VALUE vpasswd)
+{
+  t_envh *eh;
+  const char *passwd;
+  int rv;
+
+  passwd = StringValueCStr(vpasswd);
+  Data_Get_Struct(obj, t_envh, eh);
+  u_int32_t flags=0x00000001; //DB_ENCRYPT_AES
+  
+  rv = eh->env->set_encrypt(eh->env, passwd, flags);
+  if ( rv != 0 ) {
+    raise_error(rv, "env_set_encrypt: %s",db_strerror(rv));
+  }
+
+  return vpasswd;
+}
+
+/*
+ * call-seq:
  * env.rep_priority = int
  *
  * specify how the replication manager will handle acknowledgement of replication messages
@@ -3331,6 +3377,8 @@ EXCEPTIONS_CREATE
   rb_define_method(cDb,"sync",db_sync,0);
   rb_define_method(cDb,"truncate",db_truncate,1);
 
+  rb_define_method(cDb,"encrypt=",db_set_encrypt,1);
+
 #if DB_VERSION_MAJOR == 5 || DB_VERSION_MINOR > 3
   rb_define_method(cDb,"compact",db_compact,5);
 #endif
@@ -3386,6 +3434,9 @@ EXCEPTIONS_CREATE
   rb_define_method(cEnv,"tmp_dir",env_get_tmp_dir,0);
   rb_define_method(cEnv,"home",env_get_home,0);
   rb_define_method(cEnv,"set_verbose",env_set_verbose,2);
+
+  rb_define_method(cEnv,"encrypt=",env_set_encrypt,1);
+  //rb_define_method(cEnv,"encrypt",env_get_encrypt,0);
 
   rb_define_method(cEnv,"rep_priority=", env_rep_set_priority, 1);
   rb_define_method(cEnv,"rep_priority", env_rep_get_priority, 0);
