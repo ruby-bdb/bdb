@@ -7,9 +7,9 @@ begin
     gem.name = "bdb"
     gem.summary = %Q{Ruby Berkeley DB}
     gem.description = %Q{Advanced Ruby Berkeley DB library.}
-    gem.email = %w[code@justinbalthrop.com Denis.Knauf@gmail.com]
+    gem.email = %w[code@justinbalthrop.com Denis.Knauf@gmail.com ash.moran@patchspace.co.uk]
     gem.homepage = "http://github.com/ninjudd/bdb"
-    gem.authors = ["Justin Balthrop", "Denis Knauf"]
+    gem.authors = ["Justin Balthrop", "Denis Knauf", "Ash Moran"]
     gem.files = %w[AUTHORS README.md VERSION ext/*.c ext/*.h lib/**/*.rb test/*.rb]
     gem.extensions = %w[ext/extconf.rb]
     gem.require_paths = %w[ext lib]
