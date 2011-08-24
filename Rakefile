@@ -4,11 +4,11 @@ require 'rake'
 begin
   require 'jeweler'
   Jeweler::Tasks.new do |gem|
-    gem.name = "dk-bdb"
+    gem.name = "bdb"
     gem.summary = %Q{Ruby Berkeley DB}
     gem.description = %Q{Advanced Ruby Berkeley DB library.}
     gem.email = %w[code@justinbalthrop.com Denis.Knauf@gmail.com]
-    gem.homepage = "http://github.com/DenisKnauf/bdb"
+    gem.homepage = "http://github.com/ninjudd/bdb"
     gem.authors = ["Justin Balthrop", "Denis Knauf"]
     gem.files = %w[AUTHORS README.md VERSION ext/*.c ext/*.h lib/**/*.rb test/*.rb]
     gem.extensions = %w[ext/extconf.rb]
