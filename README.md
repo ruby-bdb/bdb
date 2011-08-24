@@ -1,7 +1,16 @@
 Description
 ===
 
-Ruby bindings for Berkeley DB versions 4.2-4.8.
+Ruby bindings for Berkeley DB versions 4.2-5.1.
+
+One of the [ruby-bdb][ruby-bdb] projects. See also:
+
+* [sbdb][sbdb] - A simpler, more Ruby-like API
+* [tuple][tuple] - A binary array serialisation library used by bdb internally
+
+[ruby-bdb]: http://github.com/ruby-bdb
+[sbdb]: http://github.com/ruby-bdb/sbdb
+[tuple]: http://github.com/ruby-bdb/tuple
 
 Installation
 ============
@@ -11,21 +20,22 @@ From Git
 
 You can check out the latest source from git:
 
-	git clone git://github.com/DenisKnauf/bdb.git
+	git clone git://github.com/ruby-bdb/bdb.git
 
 As a Gem
-========
+--------
 
-At the moment this library is not available on Rubyforge.  To install it as a
+At the moment this library is not available on RubyForge.  To install it as a
 gem, do the following:
 
-	sudo gem install dk-bdb
+	[sudo] gem install bdb
 
 For Berkeley DB v4.7 installed from MacPorts do the following:
 
-	sudo env ARCHFLAGS="-arch i386" gem install dk-bdb
+	[sudo] env ARCHFLAGS="-arch i386" gem install bdb
 
 This assumes you're on OS X and BerkeleyDB wasn't compiled as a universal binary.
+
 
 Sample Usage
 ============
@@ -51,21 +61,19 @@ Sample Usage
 	db.close(0)
 	env.close
 
+
 API
 ===
 
 This interface is most closely based on the DB4 C api and tries to maintain close 
-interface proximity.
-[That API is published by Oracle](http://www.oracle.com/technology/documentation/berkeley-db/db/api_reference/C/frame_main.html).
+interface proximity. [That API is published by Oracle][oracle-api].
+
+[oracle-api]: http://www.oracle.com/technology/documentation/berkeley-db/db/api_reference/C/frame_main.html
 
 All function arguments systematically omit the leading DB handles and TXN handles.
 A few calls omit the flags parameter when the documentation indicates that no
 flag values are used - cursor.close is one.
 
-Alternative API
----------------
-
-You can use [SBDB](http://github.com/DenisKnauf/sbdb), too.  It is easier to use, but base on this library.
 
 Notes
 =====
@@ -80,8 +88,10 @@ flawlessly.
 The authors have put all possible caution into ensuring that DB and Ruby cooperate.
 The memory access was one aspect carefully considered. Since Ruby copies
 when doing String#new, all key/data retrieval from DB is done with a 0 flag,
-meaning that DB will be responsible. See [*this* news group posting](http://groups.google.com/group/comp.databases.berkeley-db/browse_frm/thread/4f70a9999b64ce6a/c06b94692e3cbc41?tvc=1&q=dbt+malloc#c06b94692e3cbc41)
+meaning that DB will be responsible. See [*this* news group posting][newsgroup-post]
 about the effect of that.
+
+[newsgroup-post]: http://groups.google.com/group/comp.databases.berkeley-db/browse_frm/thread/4f70a9999b64ce6a/c06b94692e3cbc41?tvc=1&q=dbt+malloc#c06b94692e3cbc41
 
 The only other design consideration of consequence was associate. The prior
 version used a Ruby thread local variable and kept track of the current
