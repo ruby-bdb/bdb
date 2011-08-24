@@ -62,10 +62,5 @@ def create_header
   }
 end
 
-#if lib_ok
-  create_header
-  create_makefile('bdb')
-#else
-#  $stderr.puts("cannot create Makefile")
-#  exit 1
-#end
+create_header
+create_makefile('bdb')
