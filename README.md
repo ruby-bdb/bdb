@@ -36,7 +36,7 @@ Sample Usage
 	             Bdb::DB_INIT_LOCK | # Initialize locking.
 	             Bdb::DB_INIT_LOG  | # Initialize logging
 	             Bdb::DB_INIT_MPOOL  # Initialize the in-memory cache.
-	env.encrypt = 'yourpassword'             
+	# env.encrypt = 'yourpassword'   # If you need it.
 	env.open(File.join(File.dirname(__FILE__), 'tmp'), env_flags, 0);
 	
 	db = env.db
