@@ -689,12 +689,13 @@ VALUE db_get(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vdata, VALUE vflags)
     data.data = RSTRING_PTR(vdata);
     data.size = RSTRING_LEN(vdata);
   }
-  data.flags = DB_DBT_MALLOC;
+  else
+    data.flags = DB_DBT_MALLOC;
 
   rv = dbh->db->get(dbh->db,txn?txn->txn:NULL,&key,&data,flags);
   if ( rv == 0 ) {
     str = rb_str_new(data.data,data.size);
-    if (data.data) free(data.data);
+    if (data.flags == DB_DBT_MALLOC && data.data) free(data.data);
     return str;
   } else if (rv == DB_NOTFOUND) {
     return Qnil;
