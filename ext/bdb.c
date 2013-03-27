@@ -596,6 +596,7 @@ VALUE db_put(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vdata, VALUE vflags)
   u_int32_t flags=0;
   DBT key,data;
   t_txnh *txn=NULL;
+  VALUE ret=obj;
 
   memset(&key,0,sizeof(DBT));
   memset(&data,0,sizeof(DBT));
@@ -613,10 +614,14 @@ VALUE db_put(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vdata, VALUE vflags)
   if (!dbh->db)
     raise_error(0,"db is closed");
 
-	key.data = RSTRING_PTR(vkey);
-	key.size = RSTRING_LEN(vkey);
-	key.flags = LMEMFLAG;
-
+  if ( ! NIL_P(vkey) ) {	
+    key.data = RSTRING_PTR(vkey);
+    key.size = RSTRING_LEN(vkey);
+    key.flags = LMEMFLAG;
+  }
+  else
+    key.flags = DB_DBT_MALLOC;
+    
   StringValue(vdata);
   data.data = RSTRING_PTR(vdata);
   data.size = RSTRING_LEN(vdata);
@@ -631,13 +636,12 @@ VALUE db_put(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vdata, VALUE vflags)
     raise_error(rv, "db_put fails: %s",db_strerror(rv));
   }
 
-	if ( flags & DB_APPEND == DB_APPEND ) {
-    VALUE str = rb_str_new(key.data,key.size);
-    if (key.data) free(key.data);
-    return str;
-	}
+  if ( (flags & DB_APPEND) == DB_APPEND )
+    ret = rb_str_new(key.data,key.size);
 
-  return obj;
+  if (key.flags == DB_DBT_MALLOC && key.data) free(key.data);
+
+  return ret;
 }
 
 /*
