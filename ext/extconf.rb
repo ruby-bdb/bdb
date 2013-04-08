@@ -1,22 +1,28 @@
 #!/usr/bin/env ruby
 require 'mkmf'
 
+bdb_directories = [ ]
+
 # This list is checked in reverse order, so this order allows mkmf on my Mac
 # to find BDB installed via Homebrew (/usr/local) before system installs
 %w[/usr / /usr/local /usr/local/db* /usr/local/BerkeleyDB*].each do |pdir|
-	Dir[pdir].each do |dir|
-		dir_config('db', "#{dir}/include", "#{dir}/lib")
-	end
+        Dir[pdir].each do |dir|
+          bdb_directories << { :include => "#{dir}/include", :lib => "#{dir}/lib" }
+        end
 end
 
 # MacPorts installs the directories "inside-out" compared to the structure expected above
-macports_db_versions = Dir["/opt/local/include/db*"].map { |dir| /\d\d$/.match(dir)[0] }
+macports_db_versions = Dir["/opt/local/include/db*"].map { |dir| %r|db(\d\d)$|.match(dir) }.compact.map { |match| match[1] }
 macports_db_versions.each do |version|
-  dir_config('db', "/opt/local/include/db#{version}", "/opt/local/lib/db#{version}")
+  bdb_directories << { :include => "/opt/local/include/db#{version}", :lib => "/opt/local/lib/db#{version}" }
 end
 
-%w(db-5.1 db-5.0 db-4.9 db-4.8 db-4.7 db-4.6 db-4.5 db-4.4 db-4.3 db-4.2).each do |ver|
-	have_library ver, 'db_version', 'db.h'
+bdb_directories.each do |bdb_directory|
+  dir_config('db', bdb_directory[:include], bdb_directory[:lib])
+end
+
+%w(db-5.1 db-5.0 db-4.9 db-4.8 db-4.7 db-4.6 db-4.5 db-4.4 db-4.3 db-4.2).detect do |version|
+        have_library version, 'db_version', 'db.h'
 end
 
 def create_header
