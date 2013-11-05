@@ -73,6 +73,7 @@ raise_error(int code, const char *fmt, ...)
   char buf[1024];
   VALUE exc;
   VALUE argv[2];
+  VALUE cl;
 
   va_init_list(args,fmt);
   vsnprintf(buf,1024,fmt,args);
@@ -80,7 +81,6 @@ raise_error(int code, const char *fmt, ...)
 
   argv[0]=rb_str_new2(buf);
   argv[1]=INT2NUM(code);
-	VALUE cl;
 	switch( code) {
 #define eDbE_create(n,c) case DB_##n: cl = eDbE_##c; break;
 	EXCEPTIONS_CREATE
@@ -325,10 +325,11 @@ VALUE db_set_re_len(VALUE obj, VALUE re_len) {
 VALUE db_get_re_len( VALUE obj) {
 	u_int32_t re_len;
 	t_dbh *dbh;
+  int rv;
 	Data_Get_Struct(obj,t_dbh,dbh);
   if (!dbh->db)
     raise_error(0,"db isn't created");
-	int rv = dbh->db->get_re_len(dbh->db,&re_len);
+	rv = dbh->db->get_re_len(dbh->db,&re_len);
   if ( rv != 0 )
     raise_error(rv, "db_get_re_len failure: %s",db_strerror(rv));
 	return UINT2NUM(re_len);
@@ -1069,10 +1070,10 @@ VALUE db_set_encrypt(VALUE obj, VALUE vpasswd) {
     int rv;
     t_dbh *dbh;
     const char *passwd;
+    u_int32_t flags=0x00000001; //DB_ENCRYPT_AES
  
     passwd = StringValueCStr(vpasswd);
     Data_Get_Struct(obj,t_dbh,dbh);
-    u_int32_t flags=0x00000001; //DB_ENCRYPT_AES
        
     rv = dbh->db->set_encrypt(dbh->db, passwd, flags);
     
@@ -1211,7 +1212,7 @@ int assoc_callback(DB *secdb, const DBT* pkey, const DBT* data, DBT* skey)
   VALUE retv;
   VALUE args[4];
   VALUE keys;
-  int i;
+  size_t i;
 
   memset(skey,0,sizeof(DBT));
   dbh=secdb->app_private;
@@ -1247,7 +1248,7 @@ int assoc_callback(DB *secdb, const DBT* pkey, const DBT* data, DBT* skey)
       memset(skey->data, 0, skey->size * sizeof(DBT));
     
       for (i=0; i<skey->size; i++) {
-        assoc_key(skey->data + i * sizeof(DBT), (VALUE)RARRAY_PTR(keys)[i]);
+        assoc_key(((DBT *)skey->data) + i, (VALUE)RARRAY_PTR(keys)[i]);
       }
       return 0;
     }
@@ -2250,7 +2251,7 @@ VALUE env_txn_stat(VALUE obj, VALUE vflags)
   DB_TXN_STAT *statp;
   VALUE s_obj;
   VALUE active;
-  int i;
+  size_t i;
 
   if ( ! NIL_P(vflags))
     flags=NUM2UINT(vflags);
@@ -2739,6 +2740,8 @@ VALUE env_get_data_dirs(VALUE obj)
   const char **data_dirs;
   int rv;
 	int ln;
+  int i;
+  VALUE rb_data_dirs;
 
   Data_Get_Struct(obj,t_envh,eh);
   if (!eh->env)
@@ -2749,8 +2752,7 @@ VALUE env_get_data_dirs(VALUE obj)
   }
 
 	ln = (sizeof (data_dirs))/sizeof(data_dirs[0]);
-	VALUE rb_data_dirs = rb_ary_new2(ln);
-	int i;
+	rb_data_dirs = rb_ary_new2(ln);
 	for (i=0; i<ln; i++) {
 		rb_ary_push(rb_data_dirs, rb_str_new2(data_dirs[i]));
 	}
@@ -2907,10 +2909,10 @@ VALUE env_set_encrypt(VALUE obj, VALUE vpasswd)
   t_envh *eh;
   const char *passwd;
   int rv;
+  u_int32_t flags=0x00000001; //DB_ENCRYPT_AES
 
   passwd = StringValueCStr(vpasswd);
   Data_Get_Struct(obj, t_envh, eh);
-  u_int32_t flags=0x00000001; //DB_ENCRYPT_AES
   
   rv = eh->env->set_encrypt(eh->env, passwd, flags);
   if ( rv != 0 ) {
