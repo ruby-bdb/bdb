@@ -82,6 +82,7 @@ raise_error(int code, const char *fmt, ...)
   argv[0]=rb_str_new2(buf);
   argv[1]=INT2NUM(code);
 	switch( code) {
+#undef eDbE_create
 #define eDbE_create(n,c) case DB_##n: cl = eDbE_##c; break;
 	EXCEPTIONS_CREATE
 	default: cl = eDbError; break;
@@ -3331,6 +3332,7 @@ void Init_bdb() {
 
   cDb = rb_define_class_under(mBdb,"Db", rb_cObject);
   eDbError = rb_define_class_under(mBdb,"DbError",rb_eStandardError);
+#undef eDbE_create
 #define eDbE_create(n,c) eDbE_##c = rb_define_class_under(mBdb, #c, eDbError);
 EXCEPTIONS_CREATE
 
@@ -3424,6 +3426,7 @@ EXCEPTIONS_CREATE
   rb_define_method(cEnv,"shm_key=",env_set_shm_key,1);
   rb_define_method(cEnv,"shm_key",env_get_shm_key,0);
 	rb_define_method(cEnv,"log_config",env_log_set_config,2);
+#undef ENV_LOG_CONFIG_FUNC
 #define ENV_LOG_CONFIG_FUNC(name,cnst) \
 	rb_define_method(cEnv,"log_"#name "=",env_log_set_##cnst,1); \
 	rb_define_method(cEnv,"log_"#name,env_log_get_##cnst,0);
