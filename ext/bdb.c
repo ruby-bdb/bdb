@@ -3120,7 +3120,7 @@ VALUE env_get_lg_bsize( VALUE obj) {
 	rv = eh->env->get_lg_bsize( eh->env, &size);
   if ( rv != 0 )
 		raise_error(rv, "env_get_lg_bsize: %s", db_strerror(rv));
-  return UINT2FIX(size);
+  return UINT2NUM(size);
 }
 
 VALUE env_set_lg_max( VALUE obj, VALUE size) {
@@ -3141,7 +3141,7 @@ VALUE env_get_lg_max( VALUE obj) {
 	rv = eh->env->get_lg_max( eh->env, &size);
   if ( rv != 0 )
 		raise_error(rv, "env_get_lg_max: %s", db_strerror(rv));
-  return UINT2FIX(size);
+  return UINT2NUM(size);
 }
 
 VALUE env_set_lg_regionmax( VALUE obj, VALUE size) {
@@ -3162,7 +3162,7 @@ VALUE env_get_lg_regionmax( VALUE obj) {
 	rv = eh->env->get_lg_regionmax( eh->env, &size);
   if ( rv != 0 )
 		raise_error(rv, "env_get_lg_regionmax: %s", db_strerror(rv));
-  return UINT2FIX(size);
+  return UINT2NUM(size);
 }
 
 
