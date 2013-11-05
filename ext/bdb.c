@@ -634,7 +634,7 @@ VALUE db_put(VALUE obj, VALUE vtxn, VALUE vkey, VALUE vdata, VALUE vflags)
     raise_error(rv, "db_put fails: %s",db_strerror(rv));
   }
 
-	if ( flags & DB_APPEND == DB_APPEND ) {
+	if ( (flags & DB_APPEND) == DB_APPEND ) {
     VALUE str = rb_str_new(key.data,key.size);
     if (key.data) free(key.data);
     return str;
@@ -1200,7 +1200,7 @@ VALUE assoc_call(VALUE *args)
 VALUE assoc_rescue(VALUE *error, VALUE e)
 {
   VALUE message = StringValue(e);
-  rb_warn(RSTRING_PTR(message));
+  rb_warn("%s", RSTRING_PTR(message));
   *error = e;
 	return Qnil;
 }
